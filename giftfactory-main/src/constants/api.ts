@@ -102,8 +102,8 @@ export const API_ENDPOINTS = {
     rfqCancel: (id: string) => `${BASE}/customer/rfq/${id}/cancel`,
   },
   payment: {
-    createOrder: `${BASE}/payment/create-order`,
-    verifyPayment: `${BASE}/payment/verify-payment`,
+    createOrder: `${BASE}/payment/orders`,
+    verifyPayment: `${BASE}/payment/verify`,
     capture: `${BASE}/payment/capture`,
     webhook: `${BASE}/payment/webhook`,
     getOrder: (id: string) => `${BASE}/payment/order/${id}`,

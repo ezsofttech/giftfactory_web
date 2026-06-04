@@ -29,6 +29,7 @@ function loadRazorpayScript(): Promise<void> {
 
 export async function openRazorpayCheckout(params: {
   productOrderId?: string;
+  productOrderNumber?: string;
   amountInINR: number;
   currency?: string;
   name?: string;
@@ -42,21 +43,33 @@ export async function openRazorpayCheckout(params: {
 
   // Use axiosInstance — it automatically includes the auth Bearer token (set via setApiAccessToken)
   // and routes through Next.js proxy rewrite (/api/v1 → backend).
-  const createRes = await axiosInstance.post("/payment/create-order", {
-    productOrderId: params.productOrderId ?? "",
-    amount: amountPaise,
-    currency: params.currency ?? "INR",
-    notes: params.notes,
-    gateway: "razorpay",
-    ...(params.orderPayload ? { orderPayload: params.orderPayload } : {}),
-  });
+  const requestBody = params.productOrderNumber
+    ? {
+        paymentFor: "PRODUCTS",
+        productOrderNumber: params.productOrderNumber,
+        currency: params.currency ?? "INR",
+      }
+    : {
+        productOrderId: params.productOrderId ?? "",
+        amount: amountPaise,
+        currency: params.currency ?? "INR",
+        notes: params.notes,
+        gateway: "razorpay",
+        ...(params.orderPayload ? { orderPayload: params.orderPayload } : {}),
+      };
+
+  const createRes = await axiosInstance.post("/payment/orders", requestBody);
+  console.log("[payments] /payment/orders response:", createRes.data);
 
   const res = createRes.data;
   const orderData = (res && (res as any).data) ? (res as any).data : (res as any);
   const gatewayOrderId = orderData?.gatewayOrderId ?? orderData?.gateway_order_id ?? orderData?.id;
   const amountFromServer = orderData?.amount ?? amountPaise;
 
-  if (!gatewayOrderId) throw new Error("Failed to create payment order");
+  if (!gatewayOrderId) {
+    console.error("[payments] gatewayOrderId is missing. Full orderData:", orderData);
+    throw new Error("Failed to create payment order");
+  }
 
   await loadRazorpayScript();
 

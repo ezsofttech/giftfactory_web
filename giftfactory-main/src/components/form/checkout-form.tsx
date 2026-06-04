@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { MapPin, Plus, Save, Mail, Truck, CreditCard, Smartphone, Wallet, Globe, Banknote, Phone } from "lucide-react";
-import { createOrder, createOrderFromCart, fetchAddresses, addAddress, fetchProductById, deleteCart, fetchProfile, sendPhoneOtp, verifyPhoneOtp, updateProfile, validateCoupon } from "@/lib/api";
+import { createOrder, createOrderFromCart, fetchAddresses, addAddress, fetchProductById, deleteCart, fetchProfile, sendPhoneOtp, verifyPhoneOtp, updateProfile, validateCoupon, fetchOrders } from "@/lib/api";
 import type { PaymentMethod, ApiCoupon, CreateOrderBody } from "@/lib/api";
 import { openRazorpayCheckout } from "@/lib/payments";
 import type { ApiAddress, ApiCart, ApiCartItem, ApiProduct } from "@/types/api";
@@ -84,13 +84,12 @@ function resolveItemIds(item: ApiCartItem, productMap?: Map<string, ApiProduct>)
 
   // 2. Check if product has variants
   const productObj = typeof item.productId === "object" ? item.productId : productMap?.get(productId);
-  const hasVariants = productObj?.variantIds && productObj.variantIds.length > 0;
 
-  if (hasVariants) {
+  if (productObj?.variantIds && productObj.variantIds.length > 0) {
     // If product has variants, variantId must be one of them or default to the first one
     if (!variantId) {
       const first = productObj.variantIds[0];
-      variantId = typeof first === "string" ? first : first?._id ?? first?.id;
+      variantId = typeof first === "string" ? first : first?._id;
     }
   } else {
     // Base product: variantId is undefined (do not send empty string)
@@ -112,7 +111,7 @@ interface PendingPaymentContext {
   totalInr: number;
   prefillName?: string;
   prefillEmail: string;
-  orderPayload: CreateOrderBody;
+  productOrderNumber: string;
 }
 
 const NEW_ADDRESS_VALUE = "new";
@@ -325,7 +324,7 @@ export function CheckoutForm({ carts, cartId, productMap, appliedCoupon, onCoupo
           email: payment.prefillEmail,
           contact: contactNumber,
         },
-        orderPayload: payment.orderPayload,
+        productOrderNumber: payment.productOrderNumber,
       });
 
       // Payment successful
@@ -435,7 +434,7 @@ export function CheckoutForm({ carts, cartId, productMap, appliedCoupon, onCoupo
       return;
     }
 
-    // Pay-first flow (online payments): open gateway checkout and create order only after payment success
+    // Online payments flow: create order first, then open gateway checkout
     try {
       const totalInr = items.reduce((s, it) => s + (it.price ?? 0) * it.quantity, 0);
 
@@ -444,11 +443,96 @@ export function CheckoutForm({ carts, cartId, productMap, appliedCoupon, onCoupo
         return;
       }
 
+      setPaymentLoading(true);
+
+      const orderRes = await createOrder(orderPayload);
+      console.log("[checkout-form] createOrder response:", orderRes);
+
+      const findKeyInObj = (obj: any, keys: string[]): string | undefined => {
+        if (!obj || typeof obj !== "object") return undefined;
+        for (const key of keys) {
+          if (typeof obj[key] === "string" && obj[key].trim()) return obj[key].trim();
+          if (typeof obj[key] === "number") return String(obj[key]);
+        }
+        for (const k in obj) {
+          if (obj[k] && typeof obj[k] === "object") {
+            const val = findKeyInObj(obj[k], keys);
+            if (val) return val;
+          }
+        }
+        return undefined;
+      };
+
+      let productOrderNumber = "";
+      const targetRequestId = findKeyInObj(orderRes, ["requestId", "request_id"]);
+      console.log("[checkout-form] targetRequestId for polling:", targetRequestId);
+
+      try {
+        const maxAttempts = 10;
+        const pollIntervalMs = 2000;
+        let matchedOrder: any = null;
+
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+          console.log(`[checkout-form] polling order status (attempt ${attempt}/${maxAttempts})...`);
+          
+          const ordersRes = await fetchOrders({ limit: 10 });
+          const orders = ordersRes?.data ?? [];
+          
+          matchedOrder = orders.find((o: any) => 
+            o.requestId === targetRequestId || 
+            o.request_id === targetRequestId ||
+            o.orderRequestId === targetRequestId ||
+            o.id === targetRequestId ||
+            o._id === targetRequestId
+          );
+
+          if (!matchedOrder && orders.length > 0) {
+            matchedOrder = orders[0]; // Fallback to the latest order
+          }
+
+          if (matchedOrder) {
+            const currentStatus = String(matchedOrder.status).toUpperCase();
+            console.log(`[checkout-form] order matched:`, matchedOrder, `status: ${currentStatus}`);
+
+            if (currentStatus === "CREATED" || currentStatus === "COMPLETED") {
+              productOrderNumber = matchedOrder.orderNumber ?? matchedOrder._id ?? matchedOrder.id ?? "";
+              break;
+            }
+
+            if (currentStatus === "FAILED" || currentStatus === "CANCELLED") {
+              throw new Error(`Order was ${currentStatus.toLowerCase()} on the server.`);
+            }
+          }
+
+          // Wait before the next attempt
+          if (attempt < maxAttempts) {
+            await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+          }
+        }
+
+        if (!productOrderNumber && matchedOrder) {
+          productOrderNumber = matchedOrder.orderNumber ?? matchedOrder._id ?? matchedOrder.id ?? "";
+        }
+      } catch (fetchErr: any) {
+        console.error("[checkout-form] Error in order status polling:", fetchErr);
+        if (fetchErr.message && (fetchErr.message.includes("failed") || fetchErr.message.includes("cancelled"))) {
+          throw fetchErr;
+        }
+      }
+
+      if (!productOrderNumber) {
+        productOrderNumber = findKeyInObj(orderRes, ["orderNumber", "order_number", "requestId", "request_id", "_id", "id"]) || "";
+      }
+
+      if (!productOrderNumber) {
+        throw new Error("Failed to retrieve order number from server.");
+      }
+
       const paymentContext: PendingPaymentContext = {
         totalInr,
         prefillName: `${values.firstName || ""} ${values.lastName || ""}`.trim() || undefined,
         prefillEmail: values.email,
-        orderPayload,
+        productOrderNumber,
       };
 
       await runOnlinePayment(paymentContext, effectiveContact);
@@ -458,6 +542,8 @@ export function CheckoutForm({ carts, cartId, productMap, appliedCoupon, onCoupo
         toast.error(message);
         form.setError("root", { message });
       }
+    } finally {
+      setPaymentLoading(false);
     }
   }
 
