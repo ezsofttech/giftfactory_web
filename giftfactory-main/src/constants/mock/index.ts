@@ -1,0 +1,1 @@
+export { headCategory } from "./categories"

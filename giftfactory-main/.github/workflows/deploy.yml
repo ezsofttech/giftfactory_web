@@ -1,0 +1,60 @@
+name: Build and Deploy giftfactory-web to ECS
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  AWS_REGION: ap-south-1
+  ECR_ACCOUNT_ID: 354130615738
+  ECR_REPO_NAME: giftfactory-frontend
+  IMAGE_NAME: giftfactory-frontend
+  ECS_CLUSTER_NAME: gift-factory-cluster
+  ECS_SERVICE_NAME: giftfactory-frontend-service
+  NEXT_PUBLIC_BASE_URL_LOCAL: https://api.giftfactory.com
+  NEXT_PUBLIC_API_BASE_URL: https://api.giftfactory.com
+  NEXT_PUBLIC_RAZORPAY_KEY_ID: rzp_test_SHa41e4oHddcxJ
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            --no-cache \
+            --build-arg NEXT_PUBLIC_BASE_URL_LOCAL="${{ env.NEXT_PUBLIC_BASE_URL_LOCAL }}" \
+            --build-arg NEXT_PUBLIC_API_BASE_URL="${{ env.NEXT_PUBLIC_API_BASE_URL }}" \
+            --build-arg NEXT_PUBLIC_RAZORPAY_KEY_ID="${{ env.NEXT_PUBLIC_RAZORPAY_KEY_ID }}" \
+            --build-arg NODE_ENV=production \
+            -t ${{ env.IMAGE_NAME }}:latest .
+
+      - name: Tag and Push Docker image to ECR
+        run: |
+          IMAGE_URI=${{ env.ECR_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPO_NAME }}:latest
+          docker tag ${{ env.IMAGE_NAME }}:latest $IMAGE_URI
+          docker push $IMAGE_URI
+
+      - name: Force new ECS deployment
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER_NAME }} \
+            --service ${{ env.ECS_SERVICE_NAME }} \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }}

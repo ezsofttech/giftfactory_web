@@ -1,0 +1,25 @@
+# Query: web/categories
+# ContextLines: 1
+
+6 results - 3 files
+
+giftfactory-main\docs\FRONTEND_API_INTEGRATION.md:
+  184  |---|---|---|---|
+  185: | GET | `/web-categories/categories/tree` | `fetchCategories()` | Public |
+  186: | GET | `/web-categories/categories/tree/:rootId/sub` | `fetchSubCategories(rootId)` | Public |
+  187  | GET | `/web/brands` | `fetchBrands()` | Public |
+
+giftfactory-main\docs\WEB_API_REFERENCE.md:
+  23  
+  24: ### Categories (`web/categories`)
+  25  
+
+  28  | GET | `/web-categories/categories/tree` | List root categories | `fetchCategories()` |
+  29: | GET | `/web-categories/categories/tree/:rootId/sub` | Sub-categories | `fetchSubCategories(rootId)` |
+  30  
+
+giftfactory-main\src\constants\api.ts:
+  51      sellerById: (id: string) => `${BASE}/web/sellers/${id}`,
+  52:     categories: `${BASE}/web-categories/categories/tree`,
+  53:     categorySub: (rootId: string) => `${BASE}/web-categories/categories/tree/${rootId}/sub`,
+  54      brands: `${BASE}/web/brands`,
