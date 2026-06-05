@@ -93,10 +93,9 @@ export async function openRazorpayCheckout(params: {
         console.log('[openRazorpayCheckout] expectedOrderId:', gatewayOrderId, 'checkout response:', response);
         try {
           await verifyPayment({
-            order_id: response.razorpay_order_id,
-            payment_id: response.razorpay_payment_id,
+            razorpay_order_id: response.razorpay_order_id,
+            razorpay_payment_id: response.razorpay_payment_id,
             razorpay_signature: response.razorpay_signature,
-            gateway: "razorpay",
           });
           resolve();
         } catch (err) {

@@ -22,7 +22,18 @@ export function BannerSection({ position = "HOME_HERO" }: { position?: string })
   });
 
   const raw = res?.data;
-  const banners = Array.isArray(raw) ? (raw as ApiBanner[]) : [];
+  const banners = Array.isArray(raw) && raw.length > 0 
+    ? (raw as ApiBanner[]) 
+    : (position === "HOME_HERO" ? [
+        {
+          _id: "default-hero",
+          title: "Step Up Your SNEAKER GAME",
+          description: "Discover the latest styles & exclusive collections.",
+          imageUrl: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=1200&auto=format&fit=crop",
+          ctaText: "Shop Now",
+          redirectUrl: "/products"
+        } as ApiBanner
+      ] : []);
 
   useEffect(() => {
     if (!api) return;
@@ -46,7 +57,7 @@ export function BannerSection({ position = "HOME_HERO" }: { position?: string })
   if (banners.length === 0) return null;
 
   return (
-    <div className="w-full container mx-auto py-3 px-3">
+    <div className="w-full container mx-auto py-3 px-3 ">
       <Carousel
         setApi={setApi}
         className="w-full"
@@ -69,7 +80,7 @@ export function BannerSection({ position = "HOME_HERO" }: { position?: string })
               : "https://picsum.photos/seed/gift/400/400";
 
             return (
-              <CarouselItem key={banner._id ?? index} className="w-full h-[240px] sm:h-[280px] md:h-[350px] overflow-hidden rounded-xl">
+              <CarouselItem key={banner._id ?? index} className="w-full h-[240px] sm:h-[280px] md:h-[350px] overflow-hidden">
                 <div className="relative w-full h-full">
                   {/* Background Image */}
                   <img

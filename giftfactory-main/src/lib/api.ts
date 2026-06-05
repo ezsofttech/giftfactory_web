@@ -138,6 +138,83 @@ export function normalizeProducts(list: any[]): ApiProduct[] {
   return list.map(normalizeProduct);
 }
 
+function mapElasticSortBy(sortBy?: string, order?: "asc" | "desc"): string | undefined {
+  if (!sortBy) return undefined;
+  const s = sortBy.toLowerCase();
+  const o = order?.toLowerCase() || "";
+
+  if (s === "price" || s === "defaultprice") {
+    return o === "desc" ? "price_desc" : "price_asc";
+  }
+  if (s === "createdat" || s === "newest") {
+    return "newest";
+  }
+  if (s === "popular" || s === "reviewcount") {
+    return "popular";
+  }
+  if (s === "relevance" || s === "title") {
+    return "relevance";
+  }
+
+  const validEnums = ["popular", "newest", "price_asc", "price_desc", "relevance"];
+  if (validEnums.includes(sortBy)) {
+    return sortBy;
+  }
+  return undefined;
+}
+
+function mapWebProductsSortBy(sortBy?: string, order?: "asc" | "desc"): string | undefined {
+  if (!sortBy) return undefined;
+  const s = sortBy.toLowerCase();
+  const o = order?.toLowerCase() || "";
+
+  if (s === "price" || s === "defaultprice") {
+    return o === "desc" ? "price_desc" : "price_asc";
+  }
+  if (s === "title" || s === "name") {
+    return o === "desc" ? "name_desc" : "name_asc";
+  }
+  if (s === "createdat") {
+    return o === "asc" ? "oldest" : "createdAt";
+  }
+  if (s === "newest" || s === "oldest") {
+    return s;
+  }
+  if (s === "popular" || s === "reviewcount") {
+    return "popular";
+  }
+  if (s === "relevance") {
+    return "relevance";
+  }
+  if (s === "rating" || s === "rating_desc" || s === "ratingdesc") {
+    return "rating_desc";
+  }
+  if (s === "featured") {
+    return "featured";
+  }
+  if (s === "bestseller" || s === "bestsellers") {
+    return "bestseller";
+  }
+
+  const validEnums = [
+    "createdAt",
+    "oldest",
+    "price_asc",
+    "price_desc",
+    "rating_desc",
+    "popular",
+    "name_asc",
+    "name_desc",
+    "relevance",
+    "featured",
+    "bestseller"
+  ];
+  const found = validEnums.find(v => v.toLowerCase() === s);
+  if (found) return found;
+
+  return undefined;
+}
+
 export async function fetchProducts(params?: FetchProductsParams): Promise<ApiResponse<ApiProduct[]>> {
   const allowed = params ?? {};
   const paramsToSend: Record<string, string | number | undefined> = {};
@@ -149,16 +226,13 @@ export async function fetchProducts(params?: FetchProductsParams): Promise<ApiRe
   const searchQuery = allowed.search?.trim();
   if (searchQuery) {
     const elasticParams: Record<string, any> = {
-      q: searchQuery,
+      query: searchQuery,
       page: allowed.page,
       limit: allowed.limit,
       categoryId: allowed.categoryId,
-      brandId: allowed.brandId,
-      vendorId: allowed.vendorId,
-      sortBy: allowed.sortBy,
-      order: allowed.order,
-      minPrice: allowed.minPrice,
-      maxPrice: allowed.maxPrice,
+      sortBy: mapElasticSortBy(allowed.sortBy, allowed.order),
+      priceMin: allowed.minPrice,
+      priceMax: allowed.maxPrice,
     };
     // Clean up empty params
     Object.keys(elasticParams).forEach(key => {
@@ -181,6 +255,12 @@ export async function fetchProducts(params?: FetchProductsParams): Promise<ApiRe
         totalPages: data?.meta?.totalPages ?? 1,
       }
     };
+  }
+
+  const mappedSort = mapWebProductsSortBy(allowed.sortBy, allowed.order);
+  if (mappedSort) {
+    paramsToSend.sortBy = mappedSort;
+    delete paramsToSend.order;
   }
 
   const { data } = await get(API_ENDPOINTS.web.products, { params: paramsToSend });
@@ -238,7 +318,7 @@ export async function fetchSearchAutoComplete(query: string, page = 1, limit = 2
     }));
 
     const { data: productsRes } = await get(API_ENDPOINTS.elasticSearch.products, {
-      params: { q: query, page, limit }
+      params: { query, page, limit }
     });
     const productsRaw = productsRes?.data ?? productsRes ?? [];
     const productsList = Array.isArray(productsRaw) ? productsRaw : (productsRaw.products ?? productsRaw.data ?? []);
@@ -285,7 +365,9 @@ export async function fetchRelatedProducts(productId: string): Promise<ApiRespon
 }
 
 export async function fetchProductReviews(productId: string): Promise<ApiResponse<unknown[]>> {
-  const { data } = await get(API_ENDPOINTS.web.productReviews(productId));
+  const { data } = await get(API_ENDPOINTS.web.productReviews, {
+    params: { productId, approved: "true" }
+  });
   return data;
 }
 
@@ -796,10 +878,9 @@ export async function createPaymentOrder(body: {
 }
 
 export async function verifyPayment(body: {
-  order_id: string;
-  payment_id: string;
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
   razorpay_signature: string;
-  gateway?: string;
 }): Promise<ApiResponse<unknown>> {
   const { data } = await post(API_ENDPOINTS.payment.verifyPayment, body);
   return data;
@@ -864,6 +945,7 @@ export async function fetchOrders(params?: {
   order?: "asc" | "desc";
   page?: number;
   limit?: number;
+  customerId?: string;
 }): Promise<ApiResponse<ApiOrder[]>> {
   const res = await get(API_ENDPOINTS.customer.orders, { params });
   const raw = res?.data ?? res;
@@ -1149,7 +1231,19 @@ export async function submitReview(body: {
   comment?: string;
   orderId?: string;
 }): Promise<ApiResponse<unknown>> {
-  const { data } = await post(API_ENDPOINTS.customer.reviews, body);
+  const payload = {
+    productId: body.productId,
+    rating: body.rating,
+    comment: body.comment || "",
+    orderId: body.orderId || "",
+  };
+  const { data } = await post(API_ENDPOINTS.customer.reviews, payload);
+  return data;
+}
+
+/** Get a single product review by ID. */
+export async function fetchReviewById(id: string): Promise<ApiResponse<unknown>> {
+  const { data } = await get(API_ENDPOINTS.customer.reviewById(id));
   return data;
 }
 

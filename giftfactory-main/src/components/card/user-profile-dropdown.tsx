@@ -13,6 +13,7 @@ import { useAuthModal } from "@/provider/auth-modal-provider";
 import { useQuery } from "@tanstack/react-query";
 import { fetchWishlistIds } from "@/lib/api";
 import { useState } from "react";
+import { User } from "lucide-react";
 
 export const UserProfileDropdown = () => {
   const [open, setOpen] = useState(false);
@@ -33,17 +34,17 @@ export const UserProfileDropdown = () => {
       {session.status === "authenticated" ? (
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
-            <button type="button" className="flex flex-col items-start text-foreground hover:text-primary transition-colors">
-              <Avatar className="h-8 w-8 ring-1 ring-border/50">
+            <button type="button" className="flex flex-col items-center text-foreground hover:text-primary transition-colors cursor-pointer">
+              <Avatar className="h-6 w-6 ring-1 ring-border/50">
                 <AvatarImage
                   src={session.data?.user?.image || "/default-avatar.png"}
                   alt={session.data?.user?.name || "User"}
                 />
-                <AvatarFallback className="text-xs font-medium bg-muted">
+                <AvatarFallback className="text-[10px] font-semibold bg-muted">
                   {session.data?.user?.name?.charAt(0)?.toUpperCase() || "S"}
                 </AvatarFallback>
               </Avatar>
-              <span className="text-xs mt-0.5 font-medium">My Account</span>
+              <span className="text-[11px] mt-1.5 font-medium text-gray-700">Account</span>
             </button>
           </PopoverTrigger>
           <PopoverContent className="w-52 p-2" align="end">
@@ -117,10 +118,10 @@ export const UserProfileDropdown = () => {
         <button
           type="button"
           onClick={() => openAuthModal()}
-          className="flex flex-col items-start text-foreground shrink-0 text-left group"
+          className="flex flex-col items-center text-gray-700 hover:text-primary transition-colors text-center cursor-pointer"
         >
-          <span className="text-muted-foreground text-xs group-hover:text-primary transition-colors">Hello, sign in</span>
-          <span className="text-sm font-medium group-hover:text-primary transition-colors">Account & Lists</span>
+          <User className="h-6 w-6 stroke-[1.8]" />
+          <span className="text-[11px] mt-1.5 font-medium">Account</span>
         </button>
       )}
     </div>

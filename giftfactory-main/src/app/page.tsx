@@ -1,47 +1,34 @@
 "use client";
 
-import {
-  BannerSection,
-  BrandShowcase,
-  ProductCarouselSection,
-  PromotionalBanners,
-  PopupBanner,
-} from "@/components/sections";
-import { FeaturedProductsHome } from "@/components/sections/featured-products-home";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  BookOpen,
-  Dumbbell,
-  Glasses,
-  Home,
-  Shield,
-  Shirt,
-  ShoppingCart,
-  Smartphone,
-  Sparkles,
-} from "lucide-react";
-import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
-import { fetchCategories, fetchProductDeals, fetchFeaturedProducts, fetchProductRecommended, fetchCustomerRecommended, subscribeNewsletter } from "@/lib/api";
+import { useState, useMemo } from "react";
+import { CheckCircle2, Loader2, MailOpen, Mail } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+
+import {
+  fetchCategories,
+  fetchProductDeals,
+  fetchFeaturedProducts,
+  fetchProductRecommended,
+  fetchCustomerRecommended,
+  subscribeNewsletter,
+  fetchFaqs
+} from "@/lib/api";
 import type { ApiCategory, ApiProduct } from "@/types/api";
-import { useMemo, useState } from "react";
-import { CheckCircle2, Loader2 } from "lucide-react";
-import { FaqSection } from "@/components/sections/faq-section";
+
+import { BannerSection, PopupBanner, BrandShowcase, ProductCarouselSection } from "@/components/sections";
+import { 
+  ServicesGrid, 
+  CategoryRibbon, 
+  FlashDeals, 
+  PromoGrid, 
+  TrendingAndWhy, 
+  HomeFaqSection 
+} from "@/components/sections/custom-sections";
 
 const MIN_DEALS = 5;
-
-const categoryIcons: Record<string, React.ReactNode> = {
-  clothing: <Shirt className="w-8 h-8 p-1.5" fill="currentColor" />,
-  electronics: <Smartphone className="w-8 h-8 p-1.5" fill="currentColor" />,
-  home: <Home className="w-8 h-8 p-1.5" fill="currentColor" />,
-  beauty: <Sparkles className="w-8 h-8 p-1.5" fill="currentColor" />,
-  sports: <Dumbbell className="w-8 h-8 p-1.5" fill="currentColor" />,
-  books: <BookOpen className="w-8 h-8 p-1.5" fill="currentColor" />,
-  accessories: <Glasses className="w-8 h-8 p-1.5" fill="currentColor" />,
-  shoes: <Shield className="w-8 h-8 p-1.5" fill="currentColor" />,
-};
 
 export default function HomePage() {
   const { data: session, status } = useSession();
@@ -70,22 +57,23 @@ export default function HomePage() {
       setNlLoading(false);
     }
   };
+
+  // 1. Fetch categories
   const { data: catRes } = useQuery({
     queryKey: ["web", "categories"],
     queryFn: fetchCategories,
-    staleTime: 10 * 60_000, // categories rarely change
+    staleTime: 10 * 60_000,
   });
   const categories = (catRes?.data ?? []) as ApiCategory[];
 
+  // 2. Fetch product deals
   const { data: dealsRes, isLoading: dealsLoading } = useQuery({
     queryKey: ["web", "products", "deals"],
     queryFn: () => fetchProductDeals({ limit: 12 }),
   });
-
   const rawDeals = (dealsRes?.data ?? []) as ApiProduct[];
 
-  // Fetch featured products in parallel (not gated on deals) so both
-  // requests fire simultaneously and we pad seamlessly with no waterfall.
+  // 3. Fetch featured products
   const { data: featuredRes, isLoading: featuredLoading } = useQuery({
     queryKey: ["web", "products", "featured"],
     queryFn: fetchFeaturedProducts,
@@ -93,7 +81,7 @@ export default function HomePage() {
   });
   const featuredProducts = (featuredRes?.data ?? []) as ApiProduct[];
 
-  // Merge deals + featured (deduplicated) to ensure at least MIN_DEALS products
+  // Merge deals + featured (deduplicated)
   const deals = useMemo(() => {
     if (rawDeals.length >= MIN_DEALS) return rawDeals;
     const merged = [...rawDeals];
@@ -108,6 +96,32 @@ export default function HomePage() {
     return merged;
   }, [rawDeals, featuredProducts]);
 
+  // 4. Fetch FAQs
+  const { data: faqRes } = useQuery({
+    queryKey: ["faqs"],
+    queryFn: fetchFaqs,
+  });
+  
+  const faqs = faqRes?.data && faqRes.data.length > 0 ? faqRes.data : [
+    {
+      question: "How do I track my order?",
+      answer: "After placing an order, you will receive a tracking link via email to monitor its shipping progress."
+    },
+    {
+      question: "What is your return policy?",
+      answer: "We offer an easy 30-day hassle-free return policy on most items. Please refer to our returns page for more info."
+    },
+    {
+      question: "Do you offer international shipping?",
+      answer: "Yes, we ship to selected international destinations. Delivery charges and times vary based on location."
+    },
+    {
+      question: "How can I contact customer support?",
+      answer: "You can reach us through our 24/7 customer support email or help center contact form."
+    }
+  ];
+
+  // 5. Fetch recommended products
   const { data: recRes, isLoading: recLoading } = useQuery({
     queryKey: status === "authenticated" ? ["customer", "recommended", session?.userId] : ["web", "products", "recommended"],
     queryFn: () =>
@@ -122,13 +136,26 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-white antialiased">
-      <BannerSection />
-      <ProductCarouselSection
-        title="Top deals"
-        products={deals}
-        isLoading={dealsLoading || (rawDeals.length < MIN_DEALS && featuredLoading)}
-        viewAllHref="/products"
-      />
+      {/* 1. Hero banner slider */}
+      <BannerSection position="HOME_HERO" />
+
+      {/* 2. Services grid info */}
+      <ServicesGrid />
+
+      {/* 3. Shop by Category circle ribbon scroll */}
+      <CategoryRibbon categories={categories} />
+
+      {/* 4. Flash Deals countdown carousel */}
+      <FlashDeals products={deals} isLoading={dealsLoading} />
+
+      {/* 5. Promotional Banners grid
+      <PromoGrid /> */}
+      <BannerSection position="HOME_MIDDLE" />
+
+      {/* 6. Featured Brands Cards */}
+      <BrandShowcase />
+
+      {/* Recommended for you */}
       <ProductCarouselSection
         title="Recommended for you"
         products={recommended}
@@ -137,102 +164,78 @@ export default function HomePage() {
         expandVariants
         reason={recReason}
       />
-      <BannerSection position="HOME_MIDDLE" />
-      <BrandShowcase />
-      <PromotionalBanners />
-
       <BannerSection position="CATEGORY_TOP" />
 
-      {/* Categories from API */}
-      <section className="relative py-16 bg-white bg-[url(https://images.unsplash.com/photo-1673479590411-853c4c035091?q=80&w=1064&auto=format&fit=crop)]">
-        <div className="absolute inset-0 bg-white/40 z-0" />
-        <div className="relative container mx-auto px-4">
-          <div className="text-center mb-12">
-            <span className="inline-block text-primary text-sm font-medium mb-3">Collections</span>
-            <h2 className="text-3xl font-bold mb-4 text-jet-black">Shop by Category</h2>
-            <p className="text-dark-gray max-w-2xl mx-auto">
-              Curated collections designed to make you look and feel your most confident self.
-            </p>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-            {categories.map((category) => {
-              const icon =
-                categoryIcons[category.name?.toLowerCase()] ?? (
-                  <ShoppingCart className="w-8 h-8 p-1.5" fill="currentColor" />
-                );
-              return (
-                <Link
-                  key={category._id}
-                  href={`/products?categoryId=${category._id}`}
-                  className="group relative aspect-square overflow-hidden rounded-xl bg-gray-50 hover:bg-dusty-rose hover:bg-opacity-10 transition-colors border border-opacity-10"
-                >
-                  <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center z-10">
-                    <div className="rounded-full bg-primary/10 text-primary p-3 group-hover:bg-primary group-hover:text-white transition-colors">
-                      {icon}
-                    </div>
-                    <h3 className="font-medium text-jet-black group-hover:text-primary transition-colors mt-4">
-                      {category.name}
-                    </h3>
-                    <span className="text-xs text-dark-gray mt-1">Shop Now →</span>
-                  </div>
-                  <div className="absolute inset-0 bg-gradient-to-t from-dusty-rose/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      </section>
+      {/* 7. Trending Products side-by-side with Why Shop With Us */}
+      <TrendingAndWhy products={featuredProducts} categories={categories} />
 
-      <FeaturedProductsHome />
-
-      {/* Newsletter */}
-      <section className="py-16 bg-gradient-to-br from-burgundy to-dark-maroon text-white bg-[url(https://images.unsplash.com/photo-1523821741446-edb2b68bb7a0?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D)]">
+      {/* 8. Stay Updated (Newsletter Banner) */}
+      <section className="py-8">
         <div className="container mx-auto px-4">
-          <div className="max-w-3xl mx-auto text-center">
-            <span className="inline-block text-dusty-rose text-sm font-medium mb-3">
-              Stay Updated
-            </span>
-            <h2 className="text-3xl font-bold mb-4">Subscribe to Our Newsletter</h2>
-            <p className="text-gray-300 mb-8 max-w-2xl mx-auto">
-              Get exclusive access to new collections, special offers, and styling tips.
-            </p>
+          <div className="bg-gradient-to-r from-[#cc176b] via-[#7c3aed] to-[#2563eb] rounded-2xl p-6 md:p-8 flex flex-col lg:flex-row items-center justify-between gap-6 shadow-xl relative overflow-hidden">
+            <div className="flex items-center gap-4 text-left">
+              <div className="bg-white/10 p-3 rounded-xl backdrop-blur-sm shrink-0 border border-white/10 flex items-center justify-center">
+                <MailOpen className="h-8 w-8 text-white stroke-[1.5]" />
+              </div>
+              <div>
+                <h2 className="text-xl md:text-2xl font-bold text-white tracking-tight">Stay Updated</h2>
+                <p className="text-white/80 text-xs md:text-sm mt-1 max-w-md font-medium leading-relaxed">
+                  Subscribe to get special offers, free giveaways, and once-in-a-lifetime deals.
+                </p>
+              </div>
+            </div>
 
             {nlSuccess ? (
-              <div className="flex flex-col items-center gap-3 py-2">
-                <CheckCircle2 className="h-10 w-10 text-green-400" />
-                <p className="text-base font-medium text-white">You're subscribed! Check your inbox for a welcome email.</p>
-                <button onClick={() => setNlSuccess(false)} className="text-sm text-gray-300 hover:text-white underline">
+              <div className="flex flex-col items-center lg:items-end gap-1.5 text-center lg:text-right shrink-0">
+                <div className="flex items-center gap-2 text-white bg-white/10 px-4 py-2 rounded-xl backdrop-blur-sm border border-white/10">
+                  <CheckCircle2 className="h-5 w-5 text-green-400 shrink-0" />
+                  <span className="font-semibold text-sm">You're subscribed! Check your inbox.</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setNlSuccess(false)}
+                  className="text-xs text-white/70 hover:text-white underline cursor-pointer"
+                >
                   Subscribe another email
                 </button>
               </div>
             ) : (
-              <form onSubmit={handleNewsletterSubmit} className="flex flex-col sm:flex-row gap-2 max-w-md mx-auto">
-                <Input
-                  type="email"
-                  placeholder="Your email address"
-                  value={nlEmail}
-                  onChange={(e) => { setNlEmail(e.target.value); setNlError(null); }}
-                  disabled={nlLoading}
-                  className="bg-white/10 border-white/30 text-white placeholder:text-gray-300 rounded-full px-6 py-5 flex-1 focus-visible:ring-white/50"
-                />
-                <Button
-                  type="submit"
-                  size="lg"
-                  disabled={nlLoading}
-                  className="bg-primary hover:bg-primary/90 rounded-full px-8 whitespace-nowrap"
-                >
-                  {nlLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                  {nlLoading ? "Subscribing…" : "Subscribe"}
-                </Button>
-              </form>
+              <div className="w-full max-w-md shrink-0">
+                <form onSubmit={handleNewsletterSubmit} className="flex items-center bg-white rounded-xl p-1.5 shadow-md border border-white/10">
+                  <div className="flex items-center pl-3 text-gray-400 shrink-0">
+                    <Mail className="h-5 w-5" />
+                  </div>
+                  <input
+                    type="email"
+                    placeholder="Enter your email address"
+                    value={nlEmail}
+                    onChange={(e) => { setNlEmail(e.target.value); setNlError(null); }}
+                    disabled={nlLoading}
+                    className="w-full bg-transparent border-none outline-none focus:ring-0 focus-visible:ring-0 text-gray-800 placeholder-gray-400 text-sm px-3 py-2 font-medium"
+                  />
+                  <Button
+                    type="submit"
+                    disabled={nlLoading}
+                    className="bg-[#cc176b] hover:bg-[#b0135c] text-white text-sm font-bold px-6 py-2.5 rounded-lg shrink-0 transition-colors shadow-sm cursor-pointer border-none h-auto flex items-center justify-center min-w-[100px]"
+                  >
+                    {nlLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Subscribe"}
+                  </Button>
+                </form>
+                {nlError && (
+                  <p className="text-red-200 text-xs mt-2 font-medium text-left pl-2">
+                    {nlError}
+                  </p>
+                )}
+              </div>
             )}
-
-            {nlError && <p className="mt-3 text-sm text-red-300">{nlError}</p>}
           </div>
         </div>
-        
       </section>
-      <FaqSection />
+
+      {/* 9. Frequently Asked Questions grid */}
+      <HomeFaqSection faqs={faqs} />
+
+      {/* 10. Popup Banner (e.g. promo modals) */}
       <PopupBanner />
     </div>
   );

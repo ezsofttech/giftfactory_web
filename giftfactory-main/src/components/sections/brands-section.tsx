@@ -3,10 +3,24 @@
 import React, { useCallback, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchBrands } from "@/lib/api";
-import type { ApiBrand } from "@/types/api";
+import { type ApiBrand, getValidImageUrl } from "@/types/api";
 import Link from "next/link";
 import Image from "next/image";
+import { ChevronRight } from "lucide-react";
 import gsap from "gsap";
+
+const defaultBrands: ApiBrand[] = [
+  { _id: "b1", name: "Apple", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/f/fa/Apple_logo_black.svg" },
+  { _id: "b2", name: "Samsung", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/2/24/Samsung_Logo.svg" },
+  { _id: "b3", name: "Sony", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/c/ca/Sony_logo.svg" },
+  { _id: "b4", name: "Dell", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/1/18/Dell_logo_2016.svg" },
+  { _id: "b5", name: "HP", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/a/ad/HP_logo_2012.svg" },
+  { _id: "b6", name: "Nike", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/a/a6/Logo_NIKE.svg" },
+  { _id: "b7", name: "Adidas", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/2/20/Adidas_Logo.svg" },
+  { _id: "b8", name: "Canon", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/b/bd/Canon_logo.svg" },
+  { _id: "b9", name: "JBL", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/2/22/JBL_logo.svg" },
+  { _id: "b10", name: "Bose", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/e/ec/Bose_logo.svg" },
+];
 
 // ─── Marquee Row ─────────────────────────────────────────────────────────────
 function MarqueeRow({
@@ -59,34 +73,35 @@ function MarqueeRow({
 
   return (
     <div
-      className="flex items-center whitespace-nowrap will-change-transform"
+      className="flex items-center whitespace-nowrap will-change-transform py-2"
       ref={trackRef}
       onMouseEnter={pause}
       onMouseLeave={resume}
     >
       {loopBrands.map((brand, i) => {
-        const logo = brand.icon?.secure_url ?? brand.logoUrl;
+        const rawLogo = brand.imageUrl ?? brand.icon?.secure_url ?? brand.logoUrl;
+        const logo = rawLogo ? getValidImageUrl(rawLogo) : null;
         return (
           <Link
             key={`${brand._id}-${i}`}
             href={`/products?brandId=${brand._id}`}
-            className="group inline-flex items-center gap-3 mx-3 shrink-0"
-            onMouseEnter={(e) => gsap.to(e.currentTarget, { scale: 1.07, duration: 0.22, ease: "power2.out" })}
+            className="group inline-flex items-center gap-3 mx-3 shrink-0 cursor-pointer"
+            onMouseEnter={(e) => gsap.to(e.currentTarget, { scale: 1.05, duration: 0.22, ease: "power2.out" })}
             onMouseLeave={(e) => gsap.to(e.currentTarget, { scale: 1, duration: 0.22, ease: "power2.out" })}
           >
-            <div className="flex items-center gap-3 px-5 py-3 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm group-hover:border-white/30 group-hover:bg-white/10 transition-colors duration-300">
+            <div className="flex items-center gap-3 px-6 py-4 rounded-xl border border-gray-100 bg-white hover:border-[#cc176b]/20 hover:shadow-md transition-all duration-300 shadow-2xs">
               {logo ? (
-                <div className="relative h-7 w-16 shrink-0">
+                <div className="relative h-6 w-16 shrink-0">
                   <Image
                     src={logo}
                     alt={brand.name}
                     fill
-                    className="object-contain brightness-0 invert opacity-60 group-hover:opacity-100 transition-opacity duration-300"
+                    className="object-contain grayscale opacity-60 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-300"
                   />
                 </div>
               ) : null}
               <span
-                className={`text-xs font-black uppercase tracking-[0.15em] text-white/50 group-hover:text-white transition-colors duration-300 ${logo ? "hidden sm:inline" : ""}`}
+                className={`text-lg font-bold text-gray-500 group-hover:text-[#cc176b] transition-colors duration-300 ${logo ? "hidden sm:inline" : ""}`}
               >
                 {brand.name}
               </span>
@@ -104,81 +119,38 @@ export const BrandShowcase = () => {
     queryKey: ["web", "brands"],
     queryFn: fetchBrands,
   });
-  const brands = (res?.data ?? []) as ApiBrand[];
+  
+  const rawBrands = (res?.data ?? []) as ApiBrand[];
+  const brands = rawBrands.length > 0 ? rawBrands : defaultBrands;
 
-  const titleRef = useRef<HTMLDivElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
-  const hasAnimated = useRef(false);
-
-  const animateIn = useCallback(() => {
-    if (hasAnimated.current || !titleRef.current) return;
-    hasAnimated.current = true;
-    const chars = titleRef.current.querySelectorAll(".brand-char");
-    gsap.fromTo(
-      chars,
-      { opacity: 0, y: 20, filter: "blur(8px)" },
-      { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.6, stagger: 0.04, ease: "power3.out" }
-    );
-  }, []);
-
-  useEffect(() => {
-    const section = sectionRef.current;
-    if (!section) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) animateIn(); },
-      { threshold: 0.2 }
-    );
-    observer.observe(section);
-    return () => observer.disconnect();
-  }, [animateIn]);
-
-  if (!brands.length) return null;
-
-  const title = "SHOP BY BRANDS";
 
   return (
     <section
       ref={sectionRef}
-      className="relative overflow-hidden py-10 sm:py-14"
-      style={{
-        background: "linear-gradient(135deg, #0a0a0a 0%, #111118 50%, #0a0a0f 100%)",
-      }}
+      className="relative overflow-hidden py-12 bg-white"
     >
-      {/* Ambient glow blobs */}
-      <div className="pointer-events-none absolute -top-32 left-1/4 h-64 w-64 rounded-full bg-violet-600/10 blur-[80px]" />
-      <div className="pointer-events-none absolute -bottom-32 right-1/4 h-64 w-64 rounded-full bg-indigo-600/10 blur-[80px]" />
-
-      {/* Title */}
-      <div ref={titleRef} className="flex justify-center items-center gap-1 mb-2">
-        {title.split("").map((ch, i) =>
-          ch === " " ? (
-            <span key={i} className="brand-char inline-block w-3 opacity-0" />
-          ) : (
-            <span
-              key={i}
-              className="brand-char inline-block text-xs sm:text-sm font-black tracking-[0.25em] text-white opacity-0"
-              style={{ textShadow: "0 0 20px rgba(255,255,255,0.15)" }}
-            >
-              {ch}
-            </span>
-          )
-        )}
+      {/* Header with Title and View All */}
+      <div className="container mx-auto px-4 mb-8 flex items-center justify-between">
+        <h2 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight">Featured Brands</h2>
+        <Link href="/products?sortBy=brand" className="text-xs font-bold text-[#cc176b] hover:underline flex items-center gap-1 cursor-pointer">
+          View all brands <ChevronRight className="h-3.5 w-3.5" />
+        </Link>
       </div>
 
-      {/* Subtitle line */}
-      <p className="text-center text-[10px] text-white/25 tracking-[0.4em] uppercase mb-8">
-        top labels · curated for you
-      </p>
-
-      {/* Gradient edge masks */}
-      <div className="pointer-events-none absolute inset-y-0 left-0 w-28 z-10"
-        style={{ background: "linear-gradient(to right, #0a0a0a, transparent)" }} />
-      <div className="pointer-events-none absolute inset-y-0 right-0 w-28 z-10"
-        style={{ background: "linear-gradient(to left, #0a0a0a, transparent)" }} />
+      {/* Progressive Edge Blurs / Gradients */}
+      <div 
+        className="pointer-events-none absolute inset-y-0 left-0 w-32 z-10 hidden md:block"
+        style={{ background: "linear-gradient(to right, #ffffff, transparent)" }} 
+      />
+      <div 
+        className="pointer-events-none absolute inset-y-0 right-0 w-32 z-10 hidden md:block"
+        style={{ background: "linear-gradient(to left, #ffffff, transparent)" }} 
+      />
 
       {/* Row 1 — scroll left */}
       <div className="overflow-hidden mb-3">
-        <MarqueeRow brands={brands} direction="left" speed={50} />
+        <MarqueeRow brands={brands} direction="left" speed={40} />
       </div>
 
       {/* Row 2 — scroll right (offset brands) */}
@@ -186,7 +158,7 @@ export const BrandShowcase = () => {
         <MarqueeRow
           brands={[...brands.slice(Math.floor(brands.length / 2)), ...brands.slice(0, Math.floor(brands.length / 2))]}
           direction="right"
-          speed={45}
+          speed={35}
         />
       </div>
     </section>

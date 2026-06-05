@@ -23,7 +23,8 @@ export function getValidImageUrl(url: unknown): string {
   if (trimmed.startsWith("/")) {
     return trimmed;
   }
-  return `/${trimmed}`;
+  const prefix = process.env.NEXT_PUBLIC_AWS_PREFIX_URL || process.env.AWS_PREFIX_URL || "https://d3ori68ve27vyu.cloudfront.net";
+  return `${prefix}/${trimmed}`;
 }
 
 export interface ApiResponse<T> {
@@ -281,6 +282,7 @@ export interface ApiBrand {
   slug?: string;
   logoUrl?: string;
   icon?: { secure_url: string; key?: string };
+  imageUrl?: string;
 }
 
 export interface ApiBanner {

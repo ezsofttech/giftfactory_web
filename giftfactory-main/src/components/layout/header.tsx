@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
-import { Menu, MapPin, Home, ShoppingBag, Heart, User, Package, Settings, HelpCircle, Store, LogIn, ChevronRight, Bell } from "lucide-react";
+import { Menu, MapPin, Home, ShoppingBag, Heart, User, Package, Settings, HelpCircle, Store, LogIn, ChevronRight, Bell, ChevronDown } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -144,140 +144,104 @@ export const Header = () => {
   }, []);
 
   return (
-    <header className="bg-background border-b border-border/50 sticky top-0 z-50 shadow-sm">
-      {/* Promo bar - hidden on mobile to save space */}
-      <div className="hidden sm:block bg-primary text-white">
+    <header className="bg-background border-b border-border/20 sticky top-0 z-50 shadow-sm">
+      {/* Top promo bar */}
+      <div className="bg-[#cc176b] text-white">
         <div className="container mx-auto px-4 flex items-center justify-between py-2 text-xs">
           <span>Free worldwide shipping</span>
-          <span>60-day returns</span>
+          <div className="flex items-center gap-4">
+            <Link href="/orders" className="hover:text-white/80 transition-colors">30-Day Return</Link>
+            <Link href="/help" className="hover:text-white/80 transition-colors flex items-center gap-1">
+              <HelpCircle className="h-3 w-3" /> Help & Support
+            </Link>
+            
+          </div>
         </div>
       </div>
 
       {/* Main header */}
-      <div className="container mx-auto px-4 py-3">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-2 min-w-0 shrink-0">
+      <div className="container mx-auto px-4 py-4">
+        <div className="flex items-center justify-between gap-4">
+          {/* Logo & Deliver-to */}
+          <div className="flex items-center gap-4 min-w-0 shrink-0">
             <Link href="/" className="flex items-center shrink-0">
-              <Image
-                src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Screenshot%202025-08-04%20at%204.36.06%E2%80%AFPM-lLzzDBCkiUbUEjjT38aTaDKg3lrTsd.png"
-                alt="Gift Factory"
-                width={0}
-                height={0}
-                sizes="(max-width: 640px) 90px, 110px"
-                className="object-contain w-auto h-auto max-w-[90px] md:max-w-[110px]"
-                priority
-              />
+              <img src="/favicon.png" alt="Logo" width={150} height={150} />
             </Link>
 
+            {/* Deliver to - desktop */}
             <button
               type="button"
               onClick={openAddressSelector}
-              className="lg:hidden group flex flex-col items-start text-foreground hover:text-primary min-w-0 max-w-[125px]"
+              className="hidden lg:flex group flex-col items-start text-foreground hover:text-primary shrink-0 min-w-0 text-left cursor-pointer"
             >
-              <span className="text-muted-foreground text-[10px] leading-none flex items-center gap-0.5 group-hover:text-primary transition-colors">
+              <span className="text-muted-foreground text-[10px] uppercase font-bold tracking-wider flex items-center gap-0.5 group-hover:text-primary transition-colors">
                 <MapPin className="h-3 w-3 shrink-0" /> Deliver to
               </span>
-              <span
-                className="text-[11px] font-medium truncate w-full"
-                title={defaultAddress ? `${apiAddressStreet(defaultAddress)}, ${defaultAddress.city}, ${defaultAddress.state} ${apiAddressPostalCode(defaultAddress)}` : undefined}
-              >
-                {mobileHeaderAddressLabel}
+              <span className="text-xs font-semibold truncate max-w-[120px]" title={defaultAddress ? `${apiAddressStreet(defaultAddress)}, ${defaultAddress.city}, ${defaultAddress.state} ${apiAddressPostalCode(defaultAddress)}` : undefined}>
+                {headerAddressLabel}
               </span>
             </button>
           </div>
 
-          {/* Deliver to - desktop */}
-          <button
-            type="button"
-            onClick={openAddressSelector}
-            className="hidden lg:flex group flex-col items-start text-foreground hover:text-primary shrink-0 min-w-0"
-          >
-            <span className="text-muted-foreground text-xs flex items-center gap-0.5 group-hover:text-primary transition-colors">
-              <MapPin className="h-3.5 w-3.5 shrink-0" /> Deliver to
-            </span>
-            <span className="text-sm font-medium truncate max-w-[120px]" title={defaultAddress ? `${apiAddressStreet(defaultAddress)}, ${defaultAddress.city}, ${defaultAddress.state} ${apiAddressPostalCode(defaultAddress)}` : undefined}>
-              {headerAddressLabel}
-            </span>
-          </button>
-
           {/* Search - desktop */}
-          <div className="hidden lg:flex flex-1 min-w-0 mx-4">
+          <div className="hidden lg:flex flex-1 min-w-0 mx-6">
             <SearchForm />
           </div>
 
-          {/* Right: Account, Returns & Orders, Cart, Mobile menu */}
-          <div className="flex items-center gap-2 md:gap-4 shrink-0">
+          {/* Right: Account, Wishlist, Cart, Mobile Menu */}
+          <div className="flex items-center gap-4 md:gap-6 shrink-0">
+            {/* Account dropdown */}
             <UserProfileDropdown />
-            {status === "authenticated" ? (
-              <Link
-                href="/orders"
-                className="hidden md:flex flex-col items-start text-foreground shrink-0 group"
-              >
-                <span className="text-muted-foreground text-xs group-hover:text-primary transition-colors">Returns</span>
-                <span className="text-sm font-medium group-hover:text-primary transition-colors">& Orders</span>
-              </Link>
-            ) : (
-              <button
-                type="button"
-                onClick={() => openAuthModal({ message: "Sign in to view your orders", callbackUrl: "/orders" })}
-                className="hidden md:flex flex-col items-start text-foreground shrink-0 text-left group"
-              >
-                <span className="text-muted-foreground text-xs group-hover:text-primary transition-colors">Returns</span>
-                <span className="text-sm font-medium group-hover:text-primary transition-colors">& Orders</span>
-              </button>
-            )}
-            {status === "authenticated" ? (
-              <Link
-                href="/profile"
-                className="md:hidden relative flex items-center justify-center w-10 h-10 rounded-md hover:bg-muted transition-colors"
-                aria-label="My Account"
-              >
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground ring-1 ring-border/60">
-                  {mobileProfileInitial}
-                </span>
-              </Link>
-            ) : (
-              <button
-                type="button"
-                onClick={() => openAuthModal({ message: "Sign in to your account", callbackUrl: "/profile" })}
-                className="md:hidden relative flex flex-col items-center justify-center w-10 h-10 rounded-md hover:bg-muted transition-colors"
-                aria-label="My Account"
-              >
-                <User className="h-5 w-5" />
-                <span className="mt-0.5 text-[9px] leading-none font-medium text-foreground">Sign in</span>
-              </button>
-            )}
+
+            {/* Wishlist */}
+            <Link
+              href="/wishlist"
+              className="relative flex flex-col items-center justify-center text-gray-700 hover:text-primary transition-colors cursor-pointer"
+              aria-label="Wishlist"
+            >
+              <div className="relative">
+                <Heart className="h-6 w-6 stroke-[1.8]" />
+                {wishlistCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 bg-[#cc176b] text-white text-[9px] font-black rounded-full h-4.5 w-4.5 flex items-center justify-center">
+                    {wishlistCount}
+                  </span>
+                )}
+              </div>
+              <span className="text-[11px] mt-1 font-medium">Wishlist</span>
+            </Link>
+
+            {/* Cart */}
+            <Link
+              href="/cart"
+              className="relative flex flex-col items-center justify-center text-gray-700 hover:text-primary transition-colors cursor-pointer"
+              aria-label="Cart"
+            >
+              <div className="relative">
+                <ShoppingBag className="h-6 w-6 stroke-[1.8]" />
+                {displayCartCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 bg-[#cc176b] text-white text-[9px] font-black rounded-full h-4.5 w-4.5 flex items-center justify-center">
+                    {displayCartCount > 99 ? "99+" : displayCartCount}
+                  </span>
+                )}
+              </div>
+              <span className="text-[11px] mt-1 font-medium">Cart</span>
+            </Link>
 
             <NotificationDropdown />
 
-            <Link
-              href="/cart"
-              className="group relative flex items-center justify-center w-10 h-10 rounded-md hover:bg-muted transition-colors"
-              aria-label="Cart"
-            >
-              <CustomIcon iconName="f7:cart-fill" className="w-6 h-6 text-foreground group-hover:text-primary transition-colors" />
-              {displayCartCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 bg-amber-500 text-black text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center min-w-5">
-                  {displayCartCount > 99 ? "99+" : displayCartCount}
-                </span>
-              )}
-            </Link>
+            {/* Mobile menu sheet */}
             <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="lg:hidden h-10 w-10">
-                  <Menu className="h-6 w-6" />
+                <Button variant="ghost" size="icon" className="lg:hidden h-9 w-9">
+                  <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="w-[300px] sm:w-80 p-0 flex flex-col">
-                {/* Sheet Header */}
                 <SheetHeader className="px-4 pt-5 pb-4 border-b border-border bg-muted/30">
                   <SheetTitle className="flex items-center gap-2">
                     <Link href="/" onClick={() => setSheetOpen(false)}>
-                      <Image
-                        src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Screenshot%202025-08-04%20at%204.36.06%E2%80%AFPM-lLzzDBCkiUbUEjjT38aTaDKg3lrTsd.png"
-                        alt="Gift Factory" width={80} height={32}
-                        className="object-contain h-8 w-auto"
-                      />
+                      <span className="text-xl font-black italic text-[#cc176b]">EA</span>
+                      <span className="text-xl font-bold text-gray-900 ml-0.5">SHOP</span>
                     </Link>
                   </SheetTitle>
                   {status === "authenticated" ? (
@@ -289,7 +253,7 @@ export const Header = () => {
                         setSheetOpen(false);
                         openAuthModal();
                       }}
-                      className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                      className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-[#cc176b] px-3 py-2 text-sm font-medium text-white hover:bg-[#cc176b]/95 transition-colors cursor-pointer"
                     >
                       <LogIn className="h-4 w-4" />
                       Sign in / Register
@@ -397,15 +361,19 @@ export const Header = () => {
         <SearchForm />
       </div>
 
-      {/* Single sub-header: All + nav links + Become a Supplier / Help Center */}
-      <div className="hidden lg:block border-t border-border/50 bg-muted/30">
-        <div className="container mx-auto px-4 flex items-center justify-between gap-4 py-2">
-          <div className="flex items-center gap-0 overflow-x-auto scrollbar-hide min-w-0">
+      {/* Single sub-header: All Categories + Nav links */}
+      <div className="hidden lg:block border-t border-gray-100 bg-[#fbfbfb]">
+        <div className="container mx-auto px-4 flex items-center justify-between gap-4 py-2.5">
+          <div className="flex items-center gap-4 overflow-x-auto scrollbar-hide min-w-0">
+            {/* All Categories trigger */}
             <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="sm" className="rounded-none h-9 gap-1.5 shrink-0 font-medium px-3">
-                  <Menu className="h-4 w-4" /> All
-                </Button>
+                <button
+                  type="button"
+                  className="rounded-full bg-pink-50 hover:bg-pink-100/60 border border-pink-100/50 text-[#cc176b] font-bold text-xs px-5 py-2 flex items-center gap-2 transition-all cursor-pointer shadow-sm select-none"
+                >
+                  <Menu className="h-3.5 w-3.5" /> All Categories
+                </button>
               </SheetTrigger>
               <SheetContent side="left" className="w-80 sm:w-96 p-0 flex flex-col">
                 <SheetHeader className="px-5 pt-6 pb-4 border-b border-border">
@@ -439,26 +407,56 @@ export const Header = () => {
                 </nav>
               </SheetContent>
             </Sheet>
-            {QUICK_LINKS.map((l) => (
+
+            {/* Nav links */}
+            <div className="flex items-center gap-1">
               <Link
-                key={l.label}
-                href={l.href}
-                className="px-3 py-2 text-sm whitespace-nowrap hover:text-primary font-medium"
+                href="/"
+                className="relative px-3.5 py-1.5 text-sm font-bold text-[#cc176b] hover:text-[#cc176b] transition-colors"
               >
-                {l.label}
+                Home
+                <span className="absolute bottom-[-10px] left-3.5 right-3.5 h-[3px] bg-[#cc176b] rounded-full" />
               </Link>
-            ))}
-            {categories.slice(0, 10).map((c) => (
               <Link
-                key={c._id}
-                href={`/products?categoryId=${c._id}`}
-                className="px-3 py-2 text-sm whitespace-nowrap hover:text-primary"
+                href="/products"
+                className="px-3.5 py-1.5 text-sm font-medium text-gray-700 hover:text-[#cc176b] transition-colors flex items-center gap-1"
               >
-                {c.name}
+                Products <ChevronDown className="h-3 w-3" />
               </Link>
-            ))}
+              <Link
+                href="/products?sortBy=brand"
+                className="px-3.5 py-1.5 text-sm font-medium text-gray-700 hover:text-[#cc176b] transition-colors"
+              >
+                Brands
+              </Link>
+              <Link
+                href="/products?deals=1"
+                className="px-3.5 py-1.5 text-sm font-medium text-gray-700 hover:text-[#cc176b] transition-colors"
+              >
+                Deals
+              </Link>
+              <Link
+                href="/products?sortBy=createdAt"
+                className="px-3.5 py-1.5 text-sm font-medium text-gray-700 hover:text-[#cc176b] transition-colors"
+              >
+                New Arrivals
+              </Link>
+              <Link
+                href="/blog"
+                className="px-3.5 py-1.5 text-sm font-medium text-gray-700 hover:text-[#cc176b] transition-colors"
+              >
+                Blog
+              </Link>
+              <Link
+                href="/help"
+                className="px-3.5 py-1.5 text-sm font-medium text-gray-700 hover:text-[#cc176b] transition-colors"
+              >
+                Contact
+              </Link>
+            </div>
           </div>
-          <div className="flex items-center gap-4 text-sm text-muted-foreground shrink-0">
+
+          <div className="flex items-center gap-4 text-xs font-semibold text-gray-500 shrink-0">
             <Link href="/sell" className="hover:text-primary whitespace-nowrap transition-colors">Become a Supplier</Link>
             <Link href="/help" className="hover:text-primary whitespace-nowrap transition-colors">Help Center</Link>
           </div>
