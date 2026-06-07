@@ -95,13 +95,15 @@ function MarqueeRow({
                   <Image
                     src={logo}
                     alt={brand.name}
-                    fill
-                    className="object-contain grayscale opacity-60 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-300"
+                    width={200}
+                    height={200}
+                    className=""
+                    
                   />
                 </div>
               ) : null}
               <span
-                className={`text-lg font-bold text-gray-500 group-hover:text-[#cc176b] transition-colors duration-300 ${logo ? "hidden sm:inline" : ""}`}
+                className={`text-xl font-bold text-black `}
               >
                 {brand.name}
               </span>
@@ -154,13 +156,13 @@ export const BrandShowcase = () => {
       </div>
 
       {/* Row 2 — scroll right (offset brands) */}
-      <div className="overflow-hidden text-2xl">
+      {/* <div className="overflow-hidden text-2xl">
         <MarqueeRow
           brands={[...brands.slice(Math.floor(brands.length / 2)), ...brands.slice(0, Math.floor(brands.length / 2))]}
           direction="right"
           speed={35}
         />
-      </div>
+      </div> */}
     </section>
   );
 };
