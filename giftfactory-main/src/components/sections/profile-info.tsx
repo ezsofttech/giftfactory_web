@@ -7,7 +7,7 @@ import { useForm } from "react-hook-form";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { UserProfile } from "@/types/product";
 import { useEffect, useState } from "react";
-import { updateProfile, changePassword, fetchProfileStats } from "@/lib/api";
+import { updateProfile, changePassword, fetchProfileStats, uploadAvatar } from "@/lib/api";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
@@ -76,7 +76,7 @@ export function ProfileInfo({ user, isLoading }: ProfileInfoProps) {
     gstin: string;
   };
 
-  const { register, handleSubmit, reset } = useForm<FormValues>({
+  const { register, handleSubmit, reset, setValue, watch } = useForm<FormValues>({
     defaultValues: {
       name: "",
       email: "",
@@ -87,6 +87,36 @@ export function ProfileInfo({ user, isLoading }: ProfileInfoProps) {
       gstin: "",
     },
   });
+
+  const avatarValue = watch("avatar");
+  const [uploading, setUploading] = useState(false);
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("File size should be less than 5MB");
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const res = await uploadAvatar(file);
+      const url = res.data?.url || (res as any).url || (res as any).data;
+      if (url) {
+        setValue("avatar", url);
+        toast.success("Avatar uploaded successfully");
+      } else {
+        toast.error("Failed to get uploaded image URL");
+      }
+    } catch (err: any) {
+      const msg = err?.response?.data?.message ?? err?.message ?? "Failed to upload avatar";
+      toast.error(msg);
+    } finally {
+      setUploading(false);
+    }
+  };
 
   useEffect(() => {
     if (!isLoading && user) {
@@ -195,12 +225,26 @@ export function ProfileInfo({ user, isLoading }: ProfileInfoProps) {
     <div className="space-y-7">
       {/* ── Avatar + name ── */}
       <div className="flex items-center gap-3 sm:gap-5">
-        <Avatar className="h-14 w-14 sm:h-20 sm:w-20 ring-2 ring-border shrink-0">
-          <AvatarImage src={user?.avatar} alt={user?.name} />
-          <AvatarFallback className="bg-primary/10 text-primary text-xl sm:text-2xl font-semibold">
-            {user?.name?.charAt(0) ?? "U"}
-          </AvatarFallback>
-        </Avatar>
+        <div className="relative group shrink-0">
+          <Avatar className="h-14 w-14 sm:h-20 sm:w-20 ring-2 ring-border">
+            <AvatarImage src={avatarValue || user?.avatar} alt={user?.name} />
+            <AvatarFallback className="bg-primary/10 text-primary text-xl sm:text-2xl font-semibold">
+              {user?.name?.charAt(0) ?? "U"}
+            </AvatarFallback>
+          </Avatar>
+          {isEditing && (
+            <label className="absolute inset-0 flex items-center justify-center bg-black/50 text-white text-[10px] sm:text-xs font-medium rounded-full cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+              {uploading ? "..." : "Change"}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleAvatarUpload}
+                disabled={uploading}
+              />
+            </label>
+          )}
+        </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-base sm:text-xl font-semibold text-foreground truncate">{user?.name}</h2>
@@ -306,8 +350,30 @@ export function ProfileInfo({ user, isLoading }: ProfileInfoProps) {
             <Field label="Email" required>
               <Input {...register("email")} placeholder="Your email address" disabled={isLoading || !isEditing} />
             </Field>
-            <Field label="Avatar URL">
-              <Input {...register("avatar")} placeholder="https://example.com/avatar.png" disabled={isLoading || !isEditing} />
+            <Field label="Avatar" hint="Upload image or enter URL">
+              <div className="flex gap-2">
+                <Input {...register("avatar")} placeholder="https://example.com/avatar.png" disabled={isLoading || !isEditing} className="flex-1" />
+                {isEditing && (
+                  <div className="relative shrink-0">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={uploading || isLoading}
+                      onClick={() => document.getElementById("avatar-upload-input")?.click()}
+                    >
+                      {uploading ? "Uploading..." : "Upload File"}
+                    </Button>
+                    <input
+                      id="avatar-upload-input"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleAvatarUpload}
+                      disabled={uploading || isLoading}
+                    />
+                  </div>
+                )}
+              </div>
             </Field>
             <Field label="Phone">
               <Input {...register("phone")} placeholder="+91 98765 43210" disabled={isLoading || !isEditing} />

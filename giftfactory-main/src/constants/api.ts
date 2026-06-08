@@ -97,6 +97,7 @@ export const API_ENDPOINTS = {
     reviewById: (id: string) => `${BASE}/product-reviews/${encodeURIComponent(id)}`,
     notifications: `${BASE}/notifications`,
     notificationRead: (id: string) => `${BASE}/notifications/${encodeURIComponent(id)}/read`,
+    avatarUpload: `${BASE}/uploads/customer/avtar`,
     searchHistory: `${BASE}/customer/search-history`,
     recommended: `${BASE}/customer/recommended`,
     viewProduct: `${BASE}/customer/view-product`,

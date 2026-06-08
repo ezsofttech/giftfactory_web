@@ -672,6 +672,18 @@ export async function updateProfile(body: Partial<{
   return data;
 }
 
+/** Upload customer avatar (auth required). */
+export async function uploadAvatar(file: File): Promise<ApiResponse<{ url: string }>> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const { data } = await post(API_ENDPOINTS.customer.avatarUpload, formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+  return data;
+}
+
 export async function fetchProfileStats(): Promise<ApiResponse<{
   orderCount: number;
   wishlistCount: number;
