@@ -368,7 +368,7 @@ export default function CartPage() {
               carts.map((cart, cartIdx) => (
                 <div
                   key={cart._id}
-                  className="bg-white/90 backdrop-blur-sm border border-gray-100 rounded-3xl p-6 shadow-xl shadow-gray-200/40 space-y-4"
+                  className="bg-white/90 backdrop-blur-sm border border-gray-300 rounded-3xl p-6 shadow-xl shadow-gray-200/40 space-y-4"
                 >
                   {carts.length > 1 && (
                     <div className="flex items-center gap-2 border-b border-gray-50 pb-3">
@@ -510,7 +510,7 @@ export default function CartPage() {
                               </span>
                             </div>
 
-                            {/* WOW promo row */}
+                            {/* WOW promo row
                             <div className="flex items-center gap-1.5">
                               <span className="bg-blue-600 text-white font-extrabold px-1.5 py-0.5 rounded italic text-[9px] tracking-wide shadow-sm scale-95 origin-left select-none">
                                 WOW!
@@ -518,15 +518,15 @@ export default function CartPage() {
                               <span className="text-blue-700 font-black text-xs">
                                 Buy at ₹{Math.round(price * 0.95).toLocaleString()}
                               </span>
-                            </div>
+                            </div> */}
 
-                            {/* Protect promise row */}
+                            {/* Protect promise row
                             <div className="flex items-center gap-1.5 text-[11px] text-gray-500">
                               <span>+ ₹36 Protect Promise Fee</span>
                               <span className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-gray-50 border border-gray-300 text-[9px] font-bold text-gray-400 cursor-help hover:bg-gray-100 transition-colors select-none">
                                 i
                               </span>
-                            </div>
+                            </div> */}
 
                             {/* Delivery Date */}
                             <p className="text-[11px] font-bold text-gray-800 pt-2">
@@ -696,7 +696,7 @@ export default function CartPage() {
           )}
 
           {/* Pricing Summary Card */}
-          <div className="bg-white/90 backdrop-blur-xl border border-gray-100 rounded-3xl p-6 shadow-xl shadow-gray-200/40 space-y-6">
+          <div className="bg-white/90 backdrop-blur-xl border border-gray-300    rounded-3xl p-6 shadow-xl shadow-gray-200/40 space-y-6">
             <h2 className="text-lg font-black text-gray-900 flex items-center gap-2">
               <Award className="h-5 w-5 text-pink-500" />
               Order Summary
