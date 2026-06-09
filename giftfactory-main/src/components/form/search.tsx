@@ -20,7 +20,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
-import { fetchProductSuggest, fetchCategories, recordSearchHistory, fetchSearchAutoComplete, fetchProductRecommended } from "@/lib/api";
+import {
+  fetchProductSuggest,
+  fetchCategories,
+  recordSearchHistory,
+  fetchSearchAutoComplete,
+  fetchProductRecommended,
+  fetchSearchHistory,
+  SEARCH_HISTORY_QUERY_KEY,
+  clearAllSearchHistory,
+  deleteSearchHistoryItem
+} from "@/lib/api";
 import type { ApiCategory, ApiProduct } from "@/types/api";
 
 const formSchema = z.object({
@@ -33,7 +43,7 @@ const MIN_QUERY_LENGTH = 2;
 export function SearchForm() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const [queryForSuggest, setQueryForSuggest] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
@@ -61,6 +71,15 @@ export function SearchForm() {
     staleTime: 5 * 60 * 1000,
   });
   const trendingProducts = (trendingRes?.data?.products ?? []) as ApiProduct[];
+
+  const { data: historyRes } = useQuery({
+    queryKey: SEARCH_HISTORY_QUERY_KEY,
+    queryFn: fetchSearchHistory,
+    enabled: status === "authenticated",
+    staleTime: 30 * 1000,
+  });
+  const searchHistory = (historyRes?.data ?? []) as { id: string; query: string; categoryId?: string; createdAt: string }[];
+  const recentSearches = searchHistory.slice(0, 4);
 
   const query = form.watch("query");
 
@@ -146,11 +165,17 @@ export function SearchForm() {
       dismissSearchUi();
       const trimmedQuery = searchQuery.trim();
       const selectedCategoryId = categoryId && categoryId !== "all" ? categoryId : undefined;
-      
+
       if (status === "authenticated") {
-        recordSearchHistory({ query: trimmedQuery || undefined, categoryId: selectedCategoryId })
-          .then(() => queryClient.invalidateQueries({ queryKey: ["customer", "recommended"] }))
-          .catch(() => {});
+        recordSearchHistory({
+          query: trimmedQuery || undefined,
+          categoryId: selectedCategoryId,
+        })
+          .then(() => {
+            queryClient.invalidateQueries({ queryKey: SEARCH_HISTORY_QUERY_KEY });
+            queryClient.invalidateQueries({ queryKey: ["customer", "recommended"] });
+          })
+          .catch(() => { });
       }
 
       const params = new URLSearchParams();
@@ -158,7 +183,7 @@ export function SearchForm() {
       if (selectedCategoryId) params.set("categoryId", selectedCategoryId);
       router.push(params.toString() ? `/products?${params.toString()}` : "/products");
     },
-    [dismissSearchUi, router, status, queryClient]
+    [dismissSearchUi, router, status, session, queryClient]
   );
 
   const onSubmit = useCallback(
@@ -167,6 +192,28 @@ export function SearchForm() {
     },
     [navigateToProducts]
   );
+
+  const handleClearHistory = useCallback(async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      await clearAllSearchHistory();
+      queryClient.invalidateQueries({ queryKey: SEARCH_HISTORY_QUERY_KEY });
+    } catch (err) {
+      console.error("Failed to clear search history:", err);
+    }
+  }, [queryClient]);
+
+  const handleDeleteHistoryItem = useCallback(async (e: React.MouseEvent, id: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      await deleteSearchHistoryItem(id);
+      queryClient.invalidateQueries({ queryKey: SEARCH_HISTORY_QUERY_KEY });
+    } catch (err) {
+      console.error("Failed to delete search history item:", err);
+    }
+  }, [queryClient]);
 
   const firstSuggestion = suggestions[0]?.text || "";
   const getPostfix = () => {
@@ -185,7 +232,7 @@ export function SearchForm() {
       if (typeaheadPostfix && (e.key === "Tab" || e.key === "ArrowRight")) {
         const cursorPosition = inputRef.current?.selectionStart ?? 0;
         const textLength = inputRef.current?.value.length ?? 0;
-        
+
         // Accept on Tab, or on ArrowRight only when cursor is at the end of the text
         if (e.key === "Tab" || cursorPosition === textLength) {
           e.preventDefault();
@@ -320,37 +367,37 @@ export function SearchForm() {
                     {(() => {
                       const { ref: fieldRef, ...fieldProps } = field;
                       return (
-                    <input
-                      ref={(el) => {
-                        inputRef.current = el;
-                        fieldRef(el);
-                      }}
-                      type="text"
-                      placeholder="What are you looking for?"
-                      autoComplete="off"
-                      style={{
-                        flex: 1,
-                        height: "100%",
-                        paddingLeft: "20px",
-                        paddingRight: hasQuery ? "32px" : "12px",
-                        border: "none",
-                        outline: "none",
-                        background: "transparent",
-                        fontSize: "15px",
-                        color: "#1f2937",
-                        fontWeight: 400,
-                        width: "100%",
-                      }}
-                      className="placeholder-gray-400"
-                      {...fieldProps}
-                      onFocus={() => {
-                        setIsFocused(true);
-                        setShowSuggestions(true);
-                        setTimeout(updateDropdownRect, 0);
-                      }}
-                      onBlur={() => setIsFocused(false)}
-                      onKeyDown={handleKeyDown}
-                    />
+                        <input
+                          ref={(el) => {
+                            inputRef.current = el;
+                            fieldRef(el);
+                          }}
+                          type="text"
+                          placeholder="What are you looking for?"
+                          autoComplete="off"
+                          style={{
+                            flex: 1,
+                            height: "100%",
+                            paddingLeft: "20px",
+                            paddingRight: hasQuery ? "32px" : "12px",
+                            border: "none",
+                            outline: "none",
+                            background: "transparent",
+                            fontSize: "15px",
+                            color: "#1f2937",
+                            fontWeight: 400,
+                            width: "100%",
+                          }}
+                          className="placeholder-gray-400"
+                          {...fieldProps}
+                          onFocus={() => {
+                            setIsFocused(true);
+                            setShowSuggestions(true);
+                            setTimeout(updateDropdownRect, 0);
+                          }}
+                          onBlur={() => setIsFocused(false)}
+                          onKeyDown={handleKeyDown}
+                        />
                       );
                     })()}
                     {hasQuery && (
@@ -479,58 +526,106 @@ export function SearchForm() {
                 }
               `}</style>
 
-              {/* ── Trending (empty state) ── */}
+              {/* ── Empty state dropdown contents ── */}
               {showEmptyDropdown && (
-                <div className="p-3">
-                  <div className="flex items-center gap-2 px-2 py-1.5 mb-2">
-                    <TrendingUp className="h-3.5 w-3.5 text-pink-400 shrink-0" />
-                    <span className="text-[11px] font-bold uppercase tracking-widest text-gray-400">Trending now</span>
-                  </div>
-                  {trendingProducts.length === 0 ? (
-                    <div className="flex flex-col items-center py-6 gap-2">
-                      <Loader2 className="h-5 w-5 animate-spin text-pink-300" />
-                      <span className="text-xs text-gray-400">Loading trending…</span>
-                    </div>
-                  ) : (
-                    <ul className="space-y-0.5">
-                      {trendingProducts.map((product, i) => {
-                        const price = product.price?.sellingPrice ?? product.defaultPrice;
-                        const img = product.thumbnail ?? product.baseImageUrl?.[0];
-                        const productHref = `/products/${encodeURIComponent(product._id)}`;
-                        return (
-                          <li key={product._id}>
-                            <Link
-                              href={productHref}
-                              onClick={(e) => {
-                                e.preventDefault();
-                                dismissSearchUi();
-                                router.push(productHref);
-                              }}
-                              className="group w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-gray-50 text-left transition-colors"
-                            >
-                              {/* Rank or thumbnail */}
-                              {img ? (
-                                <div className="relative h-9 w-9 shrink-0 rounded-lg overflow-hidden border border-gray-100 bg-gray-50">
-                                  <img src={img} alt={product.title} className="h-full w-full object-cover" />
-                                </div>
-                              ) : (
-                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-pink-50 to-rose-50 border border-pink-100 text-[11px] font-black text-pink-400">
-                                  {i + 1}
+                <div className="p-3 space-y-3">
+                  {/* ── Recent Searches ── */}
+                  {recentSearches.length > 0 && (
+                    <div className="border-b border-gray-100 pb-3">
+                      <div className="flex items-center justify-between px-2 py-1.5 mb-1.5">
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-3.5 w-3.5 text-pink-400 shrink-0" />
+                          <span className="text-[11px] font-bold uppercase tracking-widest text-gray-400">Recent Searches</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleClearHistory}
+                          className="text-[11px] font-bold text-gray-400 hover:text-pink-500 transition-colors cursor-pointer"
+                        >
+                          Clear all
+                        </button>
+                      </div>
+                      <ul className="space-y-0.5">
+                        {recentSearches.map((item, idx) => (
+                          <li key={`${item.query}-${idx}`}>
+                            <div className="group w-full flex items-center justify-between rounded-xl hover:bg-gray-50 transition-colors">
+                              <div
+                                role="button"
+                                onClick={() => navigateToProducts(item.query, item.categoryId)}
+                                className="flex-1 flex items-center gap-3 px-3 py-2 text-left cursor-pointer truncate"
+                              >
+                                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-gray-50 border-gray-100 group-hover:bg-white group-hover:border-gray-200 group-hover:shadow-sm transition-all">
+                                  <Clock className="h-4 w-4 text-gray-400 group-hover:text-pink-400 transition-colors" />
                                 </span>
-                              )}
-                              <div className="flex-1 min-w-0">
-                                <span className="block text-sm font-medium text-gray-700 group-hover:text-gray-900 truncate">{product.title}</span>
-                                {price != null && (
-                                  <span className="text-xs text-pink-500 font-semibold">₹{price.toLocaleString("en-IN")}</span>
-                                )}
+                                <span className="flex-1 text-sm font-medium text-gray-700 group-hover:text-gray-900 truncate">{item.query}</span>
                               </div>
-                              <ArrowUpRight className="h-3.5 w-3.5 text-gray-300 group-hover:text-pink-400 shrink-0 transition-colors" />
-                            </Link>
+                              <button
+                                type="button"
+                                onClick={(e) => handleDeleteHistoryItem(e, item.id)}
+                                className="mr-3 p-1.5 rounded-lg text-gray-300 text-red-700 bg-red-100 transition-colors cursor-pointer  focus:opacity-100 shrink-0"
+                                aria-label="Delete search history item"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
                           </li>
-                        );
-                      })}
-                    </ul>
+                        ))}
+                      </ul>
+                    </div>
                   )}
+
+                  {/* ── Trending now ── */}
+                  <div>
+                    <div className="flex items-center gap-2 px-2 py-1.5 mb-2">
+                      <TrendingUp className="h-3.5 w-3.5 text-pink-400 shrink-0" />
+                      <span className="text-[11px] font-bold uppercase tracking-widest text-gray-400">Trending now</span>
+                    </div>
+                    {trendingProducts.length === 0 ? (
+                      <div className="flex flex-col items-center py-6 gap-2">
+                        <Loader2 className="h-5 w-5 animate-spin text-pink-300" />
+                        <span className="text-xs text-gray-400">Loading trending…</span>
+                      </div>
+                    ) : (
+                      <ul className="space-y-0.5">
+                        {trendingProducts.map((product, i) => {
+                          const price = product.price?.sellingPrice ?? product.defaultPrice;
+                          const img = product.thumbnail ?? product.baseImageUrl?.[0];
+                          const productHref = `/products/${encodeURIComponent(product._id)}`;
+                          return (
+                            <li key={product._id}>
+                              <Link
+                                href={productHref}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  dismissSearchUi();
+                                  router.push(productHref);
+                                }}
+                                className="group w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-gray-50 text-left transition-colors"
+                              >
+                                {/* Rank or thumbnail */}
+                                {img ? (
+                                  <div className="relative h-9 w-9 shrink-0 rounded-lg overflow-hidden border border-gray-100 bg-gray-50">
+                                    <img src={img} alt={product.title} className="h-full w-full object-cover" />
+                                  </div>
+                                ) : (
+                                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-pink-50 to-rose-50 border border-pink-100 text-[11px] font-black text-pink-400">
+                                    {i + 1}
+                                  </span>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <span className="block text-sm font-medium text-gray-700 group-hover:text-gray-900 truncate">{product.title}</span>
+                                  {price != null && (
+                                    <span className="text-xs text-pink-500 font-semibold">₹{price.toLocaleString("en-IN")}</span>
+                                  )}
+                                </div>
+                                <ArrowUpRight className="h-3.5 w-3.5 text-gray-300 group-hover:text-pink-400 shrink-0 transition-colors" />
+                              </Link>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
                 </div>
               )}
 

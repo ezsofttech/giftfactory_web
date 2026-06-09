@@ -98,9 +98,10 @@ export default function ProductPage({
       trackProductView({
         productId: product._id,
         categoryId,
+        customerId: session?.user?.customerId,
       });
     }
-  }, [status, product?._id, product?.categoryId]);
+  }, [status, product?._id, product?.categoryId, session]);
 
   const { data: relatedRes } = useQuery({
     queryKey: ["web", "product", productId, "related"],
@@ -189,12 +190,16 @@ export default function ProductPage({
       const catId = typeof product.categoryId === "object" && product.categoryId !== null
         ? (product.categoryId as { _id?: string })?._id
         : (product.categoryId as string | undefined);
-      trackProductView({ productId: product._id, categoryId: catId });
+      trackProductView({
+        productId: product._id,
+        categoryId: catId,
+        customerId: session?.user?.customerId,
+      });
       // Invalidate recommendation cache so next visit picks up this view signal
       queryClient.invalidateQueries({ queryKey: ["customer", "recommended"] });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [product?._id, status]);
+  }, [product?._id, status, session]);
 
   // Track product for recently viewed feature (local storage)
   useEffect(() => {

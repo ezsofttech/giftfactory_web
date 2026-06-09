@@ -244,7 +244,7 @@ export async function fetchProducts(params?: FetchProductsParams): Promise<ApiRe
     const { data } = await get(API_ENDPOINTS.elasticSearch.products, { params: elasticParams });
     const rawList = data?.data ?? data ?? [];
     const list = Array.isArray(rawList) ? rawList : (rawList.products ?? []);
-    
+
     return {
       ...data,
       data: normalizeProducts(list),
@@ -326,9 +326,9 @@ export async function fetchSearchAutoComplete(query: string, page = 1, limit = 2
     const productsRaw = productsRes?.data ?? productsRes ?? [];
     const productsList = Array.isArray(productsRaw) ? productsRaw : (productsRaw.products ?? productsRaw.data ?? []);
 
-    return { 
-      data: normalizeProducts(productsList), 
-      meta: { suggestions } 
+    return {
+      data: normalizeProducts(productsList),
+      meta: { suggestions }
     };
   } catch (e) {
     console.error("Failed to fetch search auto-complete:", e);
@@ -665,7 +665,7 @@ export async function updateProfile(body: Partial<{
   gender: string;
   dob: string;
   gstin: string;
-  
+
 }>): Promise<ApiResponse<unknown>> {
   const { data } = await patch(API_ENDPOINTS.auth.profileUpdate, body);
   console.log("updateProfile", data);
@@ -700,7 +700,7 @@ export async function fetchProfileStats(): Promise<ApiResponse<{
 export async function fetchCart(): Promise<ApiResponse<ApiCart[]>> {
   const res = await get(API_ENDPOINTS.customer.cart);
   const raw = res?.data ?? res;
-  
+
   let list: ApiCart[] = [];
   if (Array.isArray(raw)) {
     list = raw;
@@ -769,7 +769,7 @@ export async function updateCartItem(
   const { data } = await patch(API_ENDPOINTS.customer.cartItem(cartId), body);
   return data;
 }
- 
+
 export async function removeCartItem(
   cartId: string,
   body: { itemId: string }
@@ -1340,8 +1340,30 @@ export async function updateReview(
 export async function recordSearchHistory(body: {
   query?: string;
   categoryId?: string;
+  customerId?: string;
 }): Promise<ApiResponse<{ recorded: boolean }>> {
   const { data } = await post(API_ENDPOINTS.customer.searchHistory, body);
+  return data;
+}
+
+/** Search history query key used by React Query */
+export const SEARCH_HISTORY_QUERY_KEY = ["customer", "searchHistory"] as const;
+
+/** Fetch customer search history. */
+export async function fetchSearchHistory(): Promise<ApiResponse<{ id: string; query: string; categoryId?: string; createdAt: string }[]>> {
+  const { data } = await get(API_ENDPOINTS.customer.searchHistory);
+  return data;
+}
+
+/** Clear all search history. */
+export async function clearAllSearchHistory(): Promise<ApiResponse<{ success: boolean; message: string }>> {
+  const { data } = await del(API_ENDPOINTS.customer.searchHistoryClearAll);
+  return data;
+}
+
+/** Delete a specific search history record. */
+export async function deleteSearchHistoryItem(id: string): Promise<ApiResponse<{ success: boolean; message: string }>> {
+  const { data } = await del(API_ENDPOINTS.customer.searchHistoryDelete(id));
   return data;
 }
 
@@ -1349,6 +1371,7 @@ export async function recordSearchHistory(body: {
 export async function trackProductView(body: {
   productId: string;
   categoryId?: string;
+  customerId?: string;
 }): Promise<void> {
   try {
     await post(API_ENDPOINTS.customer.viewProduct, body);

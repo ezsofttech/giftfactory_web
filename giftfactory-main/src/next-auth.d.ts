@@ -7,10 +7,12 @@ declare module "next-auth" {
     user: DefaultSession["user"] & {
       role?: string;
       userId?: string;
+      customerId?: string;
     };
     accessToken?: string;
     refreshToken?: string;
     userId?: string;
+    customerId?: string;
   }
 }
 
@@ -18,6 +20,7 @@ declare module "@auth/core/jwt" {
   interface JWT {
     role?: string;
     userId?: string;
+    customerId?: string;
     accessToken?: string;
     refreshToken?: string;
   }

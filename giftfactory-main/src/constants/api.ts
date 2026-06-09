@@ -100,6 +100,8 @@ export const API_ENDPOINTS = {
     notificationRead: (id: string) => `${BASE}/notifications/${encodeURIComponent(id)}/read`,
     avatarUpload: `${BASE}/uploads/customer/avtar`,
     searchHistory: `${BASE}/customer/search-history`,
+    searchHistoryClearAll: `${BASE}/customer/search-history/all`,
+    searchHistoryDelete: (id: string) => `${BASE}/customer/search-history/${id}`,
     recommended: `${BASE}/customer/recommended`,
     viewProduct: `${BASE}/customer/view-product`,
     rfq: `${BASE}/customer/rfq`,

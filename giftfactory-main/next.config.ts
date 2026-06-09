@@ -10,13 +10,15 @@ const nextConfig: NextConfig = {
       process.env.NEXT_PUBLIC_API_BASE_URL?.trim() ||
       (process.env.NODE_ENV === "development" ? "http://localhost:9873" : "")
     ).replace(/\/+$/, "");
-    if (!base) return [];
-    return [
-      {
-        source: "/api/v1/:path*",
-        destination: `${base}/api/v1/:path*`,
-      },
-    ];
+    if (!base) return { afterFiles: [] };
+    return {
+      afterFiles: [
+        {
+          source: "/api/v1/:path*",
+          destination: `${base}/api/v1/:path*`,
+        },
+      ],
+    };
   },
   images: {
     remotePatterns: [

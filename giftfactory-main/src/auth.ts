@@ -50,14 +50,16 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
         // Signup: session created from tokens returned by otp-verification (no backend call)
         const signupToken = c._signup === "1" && c.accessToken;
         if (signupToken && c.refreshToken && c.userId) {
+          const emailStr = String(credentials.email);
           return {
             id: String(c.userId),
-            email: credentials.email,
-            name: (c.name as string) || credentials.email,
+            email: emailStr,
+            name: (c.name as string) || emailStr,
             image: null,
             accessToken: c.accessToken as string,
             refreshToken: c.refreshToken as string,
             userId: String(c.userId),
+            customerId: (c.customerId as string) || null,
           };
         }
 
@@ -86,6 +88,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
             const accessToken = json.accessToken || data.accessToken;
             const refreshToken = json.refreshToken || data.refreshToken;
             const userId = data._id ?? data.id ?? data.userId ?? data.customerId;
+            const customerId = data.customerId;
             const name = data.fullName || data.name || data.email;
             const email = data.email;
             if (!accessToken || !email) return null;
@@ -97,6 +100,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
               accessToken,
               refreshToken,
               userId: String(userId),
+              customerId: customerId ? String(customerId) : undefined,
             };
           }
 
@@ -117,6 +121,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
           const accessToken = json.accessToken || data.accessToken;
           const refreshToken = json.refreshToken || data.refreshToken;
           const userId = data._id ?? data.id ?? data.userId ?? data.customerId;
+          const customerId = data.customerId;
           const name = data.fullName || data.name || data.email;
           const email = data.email;
           if (!accessToken || !email) return null;
@@ -128,6 +133,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
             accessToken,
             refreshToken,
             userId: String(userId),
+            customerId: customerId ? String(customerId) : undefined,
           };
         } catch {
           return null;
@@ -138,11 +144,12 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
   callbacks: {
     async jwt({ token, user, trigger, session }) {
       if (user) {
-        const u = user as { userId?: string; id?: string; accessToken?: string; refreshToken?: string; name?: string };
+        const u = user as { userId?: string; id?: string; accessToken?: string; refreshToken?: string; name?: string; customerId?: string };
         token.userId = u.userId ?? u.id;
         token.accessToken = u.accessToken;
         token.refreshToken = u.refreshToken;
         token.name = u.name;
+        token.customerId = u.customerId;
 
         // Decode expiration
         const exp = u.accessToken ? getJwtExp(u.accessToken) : null;
@@ -178,10 +185,12 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
             const data = json.data || json;
             const newAccessToken = json.accessToken || data.accessToken;
             const newRefreshToken = json.refreshToken || data.refreshToken || token.refreshToken;
-
+            const newCustomerId = data.customerId || token.customerId;
+ 
             if (newAccessToken) {
               token.accessToken = newAccessToken;
               token.refreshToken = newRefreshToken;
+              token.customerId = newCustomerId;
               const exp = getJwtExp(newAccessToken);
               token.accessTokenExpires = exp ?? (Date.now() + 3600 * 1000);
             }
@@ -199,10 +208,12 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
       if (session.user) {
         session.user.id = token.userId as string;
         session.user.userId = token.userId as string;
+        session.user.customerId = token.customerId as string;
       }
       session.accessToken = token.accessToken as string;
       session.refreshToken = token.refreshToken as string;
       session.userId = token.userId as string;
+      session.customerId = token.customerId as string;
 
       // Fetch full user profile to get fullName
       if (token.accessToken) {
