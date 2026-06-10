@@ -103,6 +103,7 @@ export const API_ENDPOINTS = {
     searchHistoryClearAll: `${BASE}/customer/search-history/all`,
     searchHistoryDelete: (id: string) => `${BASE}/customer/search-history/${id}`,
     recommended: `${BASE}/customer/recommended`,
+    theme: `${BASE}/customer/theme`,
     viewProduct: `${BASE}/customer/view-product`,
     rfq: `${BASE}/customer/rfq`,
     rfqById: (id: string) => `${BASE}/customer/rfq/${id}`,

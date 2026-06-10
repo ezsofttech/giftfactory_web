@@ -187,8 +187,8 @@ export function normalizeProductReviews(
     const userStr = typeof r.user === "string"
       ? r.user.trim()
       : (r.user && typeof r.user === "object"
-          ? String((r.user as any).name || (r.user as any).fullName || "").trim()
-          : "");
+        ? String((r.user as any).name || (r.user as any).fullName || "").trim()
+        : "");
     const authorName =
       r.publisherName?.trim() ||
       r.customerId?.fullName?.trim() ||
@@ -314,7 +314,7 @@ export function resolveBannerRedirect(banner: ApiBanner): string {
   }
   const type = banner.redirectType || banner.type;
   const id = banner.redirectId || (typeof banner.product === "object" ? banner.product?._id : banner.product);
-  
+
   if (id) {
     if (type === "BRAND") {
       return `/products?brandId=${id}`;
@@ -681,6 +681,36 @@ export interface ApiFaq {
   question: string;
   answer: string;
   isPublished?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ApiTheme {
+  id?: string;
+  panelType?: "WEB" | string;
+  siteName?: string;
+  tagline?: string;
+  logoUrl?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
+  backgroundColor?: string;
+  surfaceColor?: string;
+  borderColor?: string;
+  headingColor?: string;
+  textColor?: string;
+  mutedColor?: string;
+  sidebarBgColor?: string;
+  sidebarTextColor?: string;
+  sidebarActiveBgColor?: string;
+  sidebarActiveTextColor?: string;
+  sidebarHoverBgColor?: string;
+  sidebarHoverTextColor?: string;
+  sidebarFontFamily?: string;
+  sidebarBorderRadius?: string;
+  fontFamily?: string;
+  headingFontFamily?: string;
+  baseFontSize?: string;
+  customCss?: string;
   createdAt?: string;
   updatedAt?: string;
 }

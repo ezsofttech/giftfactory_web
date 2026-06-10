@@ -17,6 +17,7 @@ import type {
   ApiOrder,
   ApiAddress,
   ApiFaq,
+  ApiTheme,
 } from "@/types/api";
 
 const get = axiosInstance.get.bind(axiosInstance);
@@ -291,7 +292,7 @@ export async function fetchProductSuggest(query: string, page = 1, limit = 20): 
     const { data: res } = await get(API_ENDPOINTS.elasticSearch.products, {
       params: { autoComplete: query, page, limit }
     });
-    
+
     let list: any[] = [];
     if (Array.isArray(res?.meta?.suggestions)) {
       list = res.meta.suggestions;
@@ -532,8 +533,28 @@ export async function fetchActiveOffers(): Promise<ApiResponse<ApiOffer[]>> {
   return data;
 }
 
-export async function fetchTheme(): Promise<ApiResponse<Record<string, unknown>>> {
+export async function fetchWebTheme(): Promise<ApiResponse<ApiTheme>> {
   const { data } = await get(API_ENDPOINTS.web.theme);
+  return data;
+}
+
+export async function fetchTheme(): Promise<ApiResponse<ApiTheme>> {
+  return fetchWebTheme();
+}
+
+export async function fetchCustomerTheme(): Promise<ApiResponse<ApiTheme>> {
+  const { data } = await get(API_ENDPOINTS.customer.theme);
+  return data;
+}
+
+export async function updateCustomerTheme(theme: Partial<ApiTheme>): Promise<ApiResponse<ApiTheme>> {
+  const { id, name, createdAt, updatedAt, ...cleanTheme } = theme as any;
+  const { data } = await patch(API_ENDPOINTS.customer.theme, cleanTheme);
+  return data;
+}
+
+export async function deleteCustomerTheme(): Promise<ApiResponse<ApiTheme>> {
+  const { data } = await del(API_ENDPOINTS.customer.theme);
   return data;
 }
 

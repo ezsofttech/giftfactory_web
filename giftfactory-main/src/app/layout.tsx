@@ -2,7 +2,7 @@ import { coolveticaFont } from "@/lib/fonts";
 import type { Metadata } from "next";
 import "./globals.css";
 import { SessionProvider } from "next-auth/react";
-import { QueryProvider } from "@/provider";
+import { QueryProvider, CustomerThemeProvider } from "@/provider";
 import { AuthApiProvider } from "@/provider/auth-api-provider";
 import { AuthModalProvider } from "@/provider/auth-modal-provider";
 import { Toaster } from "@/components/ui/sonner";
@@ -58,14 +58,16 @@ export default function RootLayout({
         <SessionProvider>
           <QueryProvider>
             <AuthApiProvider>
-              <AuthModalProvider>
-                <GuestCartSync />
-                <Header />
-                <SiteBreadcrumbs />
-                <main className="min-h-screen flex flex-col pb-14 md:pb-0">{children}</main>
-                <Footer />
-                <MobileBottomNav />
-              </AuthModalProvider>
+              <CustomerThemeProvider>
+                <AuthModalProvider>
+                  <GuestCartSync />
+                  <Header />
+                  <SiteBreadcrumbs />
+                  <main className="min-h-screen flex flex-col pb-14 md:pb-0">{children}</main>
+                  <Footer />
+                  <MobileBottomNav />
+                </AuthModalProvider>
+              </CustomerThemeProvider>
             </AuthApiProvider>
           </QueryProvider>
           <Toaster />

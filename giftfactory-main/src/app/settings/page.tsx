@@ -21,6 +21,7 @@ import {
 import { ArrowLeft, User, Lock, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { changePassword } from "@/lib/api";
+import { ThemeCustomizer } from "@/components/theme-customizer";
 
 const changePasswordSchema = z
   .object({
@@ -175,6 +176,11 @@ export default function SettingsPage() {
                 </Button>
               </form>
             </Form>
+          </div>
+
+          {/* Theme Customizer Section */}
+          <div className="pt-6 border-t border-border">
+            <ThemeCustomizer />
           </div>
         </div>
       </div>
