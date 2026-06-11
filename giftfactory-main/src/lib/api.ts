@@ -542,22 +542,6 @@ export async function fetchTheme(): Promise<ApiResponse<ApiTheme>> {
   return fetchWebTheme();
 }
 
-export async function fetchCustomerTheme(): Promise<ApiResponse<ApiTheme>> {
-  const { data } = await get(API_ENDPOINTS.customer.theme);
-  return data;
-}
-
-export async function updateCustomerTheme(theme: Partial<ApiTheme>): Promise<ApiResponse<ApiTheme>> {
-  const { id, name, createdAt, updatedAt, ...cleanTheme } = theme as any;
-  const { data } = await patch(API_ENDPOINTS.customer.theme, cleanTheme);
-  return data;
-}
-
-export async function deleteCustomerTheme(): Promise<ApiResponse<ApiTheme>> {
-  const { data } = await del(API_ENDPOINTS.customer.theme);
-  return data;
-}
-
 export async function fetchBlogList(params?: {
   page?: number;
   limit?: number;
@@ -677,8 +661,8 @@ export async function changePassword(body: Record<string, string>): Promise<ApiR
 
 // —— Newsletter (public) ——
 
-export async function subscribeNewsletter(email: string): Promise<{ message: string }> {
-  const { data } = await post(API_ENDPOINTS.newsletter.subscribe, { email });
+export async function subscribeNewsletter(email: string, source: string = "FOOTER"): Promise<{ message: string }> {
+  const { data } = await post(API_ENDPOINTS.newsletter.subscribe, { email, source });
   return data;
 }
 
@@ -1038,13 +1022,6 @@ export async function fetchOrderByOrderNumber(orderNumber: string): Promise<ApiR
   const raw = res?.data ?? res;
   const order = raw?.data ?? raw;
   return { data: normalizeOrder(order) };
-}
-
-export async function fetchOrderInvoice(orderId: string): Promise<ApiResponse<Record<string, unknown>>> {
-  const res = await get(API_ENDPOINTS.customer.orderInvoice(orderId));
-  const raw = res?.data ?? res;
-  const data = raw?.data ?? raw;
-  return { data };
 }
 
 export type PaymentMethod = "wallet" | "card" | "upi" | "cod" | "online";
@@ -1553,4 +1530,69 @@ export interface ApiCoupon {
 export async function validateCoupon(code: string): Promise<ApiResponse<ApiCoupon>> {
   const { data } = await get(API_ENDPOINTS.coupons.validate(code.trim().toUpperCase()));
   return data;
+}
+
+export async function downloadInvoice(invoiceNumber: string): Promise<ApiResponse<any>> {
+  const { data } = await get(API_ENDPOINTS.invoices.download(invoiceNumber));
+  return data;
+}
+
+export async function viewInvoice(invoiceNumber: string): Promise<ApiResponse<any>> {
+  const { data } = await get(API_ENDPOINTS.invoices.view(invoiceNumber));
+  return data;
+}
+
+export async function fetchLoyaltyBalance(): Promise<ApiResponse<{ points: number; stage: string; tier: "BRONZE" | "SILVER" | "GOLD" | "PLATINUM" }>> {
+  const { data } = await get(API_ENDPOINTS.customer.loyaltyBalance);
+  const points = data?.data?.loyaltyPoints ?? data?.data?.points ?? 0;
+  const stage = data?.data?.stage ?? "Bronze Member";
+  const tier = data?.data?.tier ?? "BRONZE";
+  return {
+    ...data,
+    data: { points, stage, tier }
+  };
+}
+
+export async function fetchLoyaltyPoints(): Promise<ApiResponse<{ points: number }>> {
+  const { data } = await get(API_ENDPOINTS.customer.loyaltyPoints);
+  const points = data?.data?.loyaltyPoints ?? data?.data?.points ?? (typeof data?.data === "number" ? data.data : 0);
+  return {
+    ...data,
+    data: { points }
+  };
+}
+
+export async function fetchLoyaltyHistory(): Promise<ApiResponse<{
+  transactions: Array<{
+    _id: string;
+    points: number;
+    type: "EARNED" | "REDEEMED";
+    reason: string;
+    createdAt: string;
+  }>;
+  balance: number;
+}>> {
+  const { data } = await get(API_ENDPOINTS.customer.loyaltyHistory);
+  const rawList = Array.isArray(data?.data) ? data.data : [];
+  
+  const transactions = rawList.map((tx: any) => {
+    const pointsVal = Math.abs(Number(tx.points ?? 0));
+    const isRedeemed = tx.type?.toUpperCase() === "REDEEMED" || String(tx.description || "").toLowerCase().includes("redeem") || tx.points < 0;
+    
+    return {
+      _id: tx.id || tx._id,
+      points: pointsVal,
+      type: isRedeemed ? ("REDEEMED" as const) : ("EARNED" as const),
+      reason: tx.description || tx.reason || "Loyalty reward activity",
+      createdAt: tx.createdAt
+    };
+  });
+  
+  return {
+    ...data,
+    data: {
+      transactions,
+      balance: 0
+    }
+  };
 }

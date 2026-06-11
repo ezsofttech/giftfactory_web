@@ -39,7 +39,7 @@ const ApplePayIcon = () => (
 
 export function Footer() {
   return (
-    <footer className="bg-[#050b18] text-slate-300 pt-16 pb-20 md:pb-16 relative overflow-hidden border-t border-slate-900">
+    <footer className="bg-[var(--footer-bg)] text-[var(--footer-fg)] pt-16 pb-20 md:pb-16 relative overflow-hidden border-t border-[var(--footer-border)]">
       <div className="container mx-auto px-6 max-w-7xl relative z-10">
         
         {/* Main Columns Grid */}
@@ -194,7 +194,7 @@ export function Footer() {
         </div>
 
         {/* Divider line */}
-        <hr className="border-slate-800/60 my-6" />
+        <hr className="border-[var(--footer-border)]/60 my-6" />
 
         {/* Bottom row */}
         <div className="flex flex-col md:flex-row justify-between items-center gap-4">

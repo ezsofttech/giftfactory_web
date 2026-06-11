@@ -25,7 +25,7 @@ import { UserProfileDropdown } from "../card";
 import { SearchForm } from "../form";
 import { useAuthModal } from "@/provider/auth-modal-provider";
 import { CustomIcon } from "../ui/custom-icon";
-import { fetchCart, fetchCategories, fetchAddresses, fetchWishlistIds, updateAddress } from "@/lib/api";
+import { fetchCart, fetchCategories, fetchAddresses, fetchWishlistIds, updateAddress, fetchLoyaltyBalance } from "@/lib/api";
 import { guestCartCount } from "@/lib/guest-cart";
 import { useNotifications } from "@/store/notification-store";
 import { NotificationDropdown } from "./notification-dropdown";
@@ -37,6 +37,31 @@ const QUICK_LINKS = [
   { label: "Best Sellers", href: "/products?sortBy=createdAt&order=desc" },
   { label: "Today's Deals", href: "/products?deals=1" },
 ];
+
+const LoyaltyCoinIcon = ({ tier, size = 18 }: { tier?: "BRONZE" | "SILVER" | "GOLD" | "PLATINUM" | string; size?: number }) => {
+  let gradientColors = ["#CD7F32", "#A57128"]; // Bronze default
+  if (tier === "SILVER") {
+    gradientColors = ["#CBD5E1", "#64748B"];
+  } else if (tier === "GOLD") {
+    gradientColors = ["#F59E0B", "#D97706"];
+  } else if (tier === "PLATINUM") {
+    gradientColors = ["#38BDF8", "#0284C7"];
+  }
+  
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className="shrink-0">
+      <defs>
+        <linearGradient id={`coinGrad-${tier}`} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor={gradientColors[0]} />
+          <stop offset="100%" stopColor={gradientColors[1]} />
+        </linearGradient>
+      </defs>
+      <circle cx="12" cy="12" r="10" fill={`url(#coinGrad-${tier})`} stroke="#ffffff" strokeWidth="1.5" />
+      <circle cx="12" cy="12" r="8" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="1" />
+      <path d="M13 3L6 13H12L11 21L18 11H12L13 3Z" fill="#ffffff" />
+    </svg>
+  );
+};
 
 export const Header = () => {
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -50,6 +75,12 @@ export const Header = () => {
     queryFn: () => fetchCart(),
     enabled: status === "authenticated",
   });
+  const { data: loyaltyRes } = useQuery({
+    queryKey: ["customer", "loyalty", "balance"],
+    queryFn: fetchLoyaltyBalance,
+    enabled: status === "authenticated",
+  });
+  const loyalty = loyaltyRes?.data;
   const { data: catRes } = useQuery({
     queryKey: ["web", "categories"],
     queryFn: fetchCategories,
@@ -146,7 +177,7 @@ export const Header = () => {
   return (
     <header className="bg-background border-b border-border/20 sticky top-0 z-50 shadow-sm">
       {/* Top promo bar */}
-      <div className="bg-[#cc176b] text-white">
+      <div className="bg-[var(--header-promo-bg)] text-[var(--header-promo-fg)]">
         <div className="container mx-auto px-4 flex items-center justify-between py-2 text-xs">
           <span>Free worldwide shipping</span>
           <div className="flex items-center gap-4">
@@ -165,7 +196,7 @@ export const Header = () => {
           {/* Logo & Deliver-to */}
           <div className="flex items-center gap-4 min-w-0 shrink-0">
             <Link href="/" className="flex items-center shrink-0">
-              <img src="/favicon.png" alt="Logo" width={150} height={150} />
+              <img src="/GiftFactoryLogo.png" alt="Logo" width={150} height={150} />
             </Link>
 
             {/* Deliver to - desktop */}
@@ -193,6 +224,21 @@ export const Header = () => {
             {/* Account dropdown */}
             <UserProfileDropdown />
 
+            {/* Loyalty points badge */}
+            {status === "authenticated" && loyalty && (
+              <Link
+                href="/loyalty"
+                className="hidden md:flex items-center gap-1.5 text-gray-700 hover:text-primary transition-colors cursor-pointer"
+                aria-label="Loyalty Rewards"
+              >
+                <LoyaltyCoinIcon tier={loyalty.tier} size={22} />
+                <span className="text-sm font-bold text-gray-900 flex items-center gap-1">
+                  {loyalty.points}
+                  <span className="text-sm font-normal text-gray-500">Points</span>
+                </span>
+              </Link>
+            )}
+
             {/* Wishlist */}
             <Link
               href="/wishlist"
@@ -202,7 +248,7 @@ export const Header = () => {
               <div className="relative">
                 <Heart className="h-6 w-6 stroke-[1.8]" />
                 {wishlistCount > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 bg-[#cc176b] text-white text-[9px] font-black rounded-full h-4.5 w-4.5 flex items-center justify-center">
+                  <span className="absolute -top-1.5 -right-1.5 bg-[var(--cart-badge-bg)] text-[var(--cart-badge-fg)] text-[9px] font-black rounded-full h-4.5 w-4.5 flex items-center justify-center">
                     {wishlistCount}
                   </span>
                 )}
@@ -219,7 +265,7 @@ export const Header = () => {
               <div className="relative">
                 <ShoppingBag className="h-6 w-6 stroke-[1.8]" />
                 {displayCartCount > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 bg-[#cc176b] text-white text-[9px] font-black rounded-full h-4.5 w-4.5 flex items-center justify-center">
+                  <span className="absolute -top-1.5 -right-1.5 bg-[var(--cart-badge-bg)] text-[var(--cart-badge-fg)] text-[9px] font-black rounded-full h-4.5 w-4.5 flex items-center justify-center">
                     {displayCartCount > 99 ? "99+" : displayCartCount}
                   </span>
                 )}
@@ -240,7 +286,7 @@ export const Header = () => {
                 <SheetHeader className="px-4 pt-5 pb-4 border-b border-border bg-muted/30">
                   <SheetTitle className="flex items-center gap-2">
                     <Link href="/" onClick={() => setSheetOpen(false)}>
-                      <span className="text-xl font-black italic text-[#cc176b]">EA</span>
+                      <span className="text-xl font-black italic text-[var(--primary)]">EA</span>
                       <span className="text-xl font-bold text-gray-900 ml-0.5">SHOP</span>
                     </Link>
                   </SheetTitle>
@@ -253,7 +299,7 @@ export const Header = () => {
                         setSheetOpen(false);
                         openAuthModal();
                       }}
-                      className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-[#cc176b] px-3 py-2 text-sm font-medium text-white hover:bg-[#cc176b]/95 transition-colors cursor-pointer"
+                      className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-3 py-2 text-sm font-medium text-[var(--primary-foreground)] hover:bg-[var(--primary)]/95 transition-colors cursor-pointer"
                     >
                       <LogIn className="h-4 w-4" />
                       Sign in / Register
@@ -268,18 +314,23 @@ export const Header = () => {
                       <p className="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">My Account</p>
                       {[
                         { href: "/profile", label: "Profile", icon: User },
+                        { href: "/loyalty", label: `Loyalty Points (${loyalty?.points ?? 0} pts)`, icon: null, isLoyalty: true },
                         { href: "/orders", label: "My Orders", icon: Package },
                         { href: "/wishlist", label: "Wishlist", icon: Heart, badge: wishlistCount },
                         { href: "/notification", label: "Notifications", icon: Bell, badge: unreadNotificationsCount },
                         { href: "/settings", label: "Settings", icon: Settings },
-                      ].map(({ href, label, icon: Icon, badge }) => (
+                      ].map(({ href, label, icon: Icon, badge, isLoyalty }) => (
                         <Link
                           key={href}
                           href={href}
                           onClick={() => setSheetOpen(false)}
                           className="flex items-center gap-3 rounded-lg px-2 py-2.5 text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
                         >
-                          <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
+                          {isLoyalty ? (
+                            <LoyaltyCoinIcon tier={loyalty?.tier} size={18} />
+                          ) : (
+                            Icon && <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
+                          )}
                           <span className="flex-1">{label}</span>
                           {badge != null && badge > 0 && (
                             <span className="bg-primary/10 text-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
@@ -370,7 +421,7 @@ export const Header = () => {
               <SheetTrigger asChild>
                 <button
                   type="button"
-                  className="rounded-full bg-pink-50 hover:bg-pink-100/60 border border-pink-100/50 text-[#cc176b] font-bold text-xs px-5 py-2 flex items-center gap-2 transition-all cursor-pointer shadow-sm select-none"
+                  className="rounded-full bg-[var(--header-category-pill-bg)] hover:bg-[var(--header-category-pill-bg)]/80 border border-[var(--border)] text-[var(--header-category-pill-fg)] font-bold text-xs px-5 py-2 flex items-center gap-2 transition-all cursor-pointer shadow-sm select-none"
                 >
                   <Menu className="h-3.5 w-3.5" /> All Categories
                 </button>
@@ -412,44 +463,44 @@ export const Header = () => {
             <div className="flex items-center gap-1">
               <Link
                 href="/"
-                className="relative px-3.5 py-1.5 text-sm font-bold text-[#cc176b] hover:text-[#cc176b] transition-colors"
+                className="relative px-3.5 py-1.5 text-sm font-bold text-[var(--primary)] hover:text-[var(--primary)] transition-colors"
               >
                 Home
-                <span className="absolute bottom-[-10px] left-3.5 right-3.5 h-[3px] bg-[#cc176b] rounded-full" />
+                <span className="absolute bottom-[-10px] left-3.5 right-3.5 h-[3px] bg-[var(--primary)] rounded-full" />
               </Link>
               <Link
                 href="/products"
-                className="px-3.5 py-1.5 text-sm font-medium text-gray-700 hover:text-[#cc176b] transition-colors flex items-center gap-1"
+                className="px-3.5 py-1.5 text-sm font-medium text-gray-700 hover:text-[var(--primary)] transition-colors flex items-center gap-1"
               >
                 Products <ChevronDown className="h-3 w-3" />
               </Link>
               <Link
                 href="/products?sortBy=brand"
-                className="px-3.5 py-1.5 text-sm font-medium text-gray-700 hover:text-[#cc176b] transition-colors"
+                className="px-3.5 py-1.5 text-sm font-medium text-gray-700 hover:text-[var(--primary)] transition-colors"
               >
                 Brands
               </Link>
               <Link
                 href="/products?deals=1"
-                className="px-3.5 py-1.5 text-sm font-medium text-gray-700 hover:text-[#cc176b] transition-colors"
+                className="px-3.5 py-1.5 text-sm font-medium text-gray-700 hover:text-[var(--primary)] transition-colors"
               >
                 Deals
               </Link>
               <Link
                 href="/products?sortBy=createdAt"
-                className="px-3.5 py-1.5 text-sm font-medium text-gray-700 hover:text-[#cc176b] transition-colors"
+                className="px-3.5 py-1.5 text-sm font-medium text-gray-700 hover:text-[var(--primary)] transition-colors"
               >
                 New Arrivals
               </Link>
               <Link
                 href="/blog"
-                className="px-3.5 py-1.5 text-sm font-medium text-gray-700 hover:text-[#cc176b] transition-colors"
+                className="px-3.5 py-1.5 text-sm font-medium text-gray-700 hover:text-[var(--primary)] transition-colors"
               >
                 Blog
               </Link>
               <Link
                 href="/help"
-                className="px-3.5 py-1.5 text-sm font-medium text-gray-700 hover:text-[#cc176b] transition-colors"
+                className="px-3.5 py-1.5 text-sm font-medium text-gray-700 hover:text-[var(--primary)] transition-colors"
               >
                 Contact
               </Link>

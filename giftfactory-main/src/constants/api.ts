@@ -82,7 +82,6 @@ export const API_ENDPOINTS = {
     orderById: (id: string) => `${BASE}/orders/${id}`,
     orderByNumber: (orderNumber: string) => `${BASE}/orders/by-number/${encodeURIComponent(orderNumber)}`,
     orderTrack: (orderNumber: string) => `${BASE}/orders/track/${encodeURIComponent(orderNumber)}`,
-    orderInvoice: (id: string) => `${BASE}/orders/${id}/invoice`,
     orderCancel: (id: string) => `${BASE}/orders/${id}/cancel`,
     orderFromCart: (cartId: string) => `${BASE}/customer/order/from-cart/${encodeURIComponent(cartId)}`,
     checkoutPreview: (cartId: string) => `${BASE}/customer/order/checkout-preview/${encodeURIComponent(cartId)}`,
@@ -103,11 +102,13 @@ export const API_ENDPOINTS = {
     searchHistoryClearAll: `${BASE}/customer/search-history/all`,
     searchHistoryDelete: (id: string) => `${BASE}/customer/search-history/${id}`,
     recommended: `${BASE}/customer/recommended`,
-    theme: `${BASE}/customer/theme`,
     viewProduct: `${BASE}/customer/view-product`,
     rfq: `${BASE}/customer/rfq`,
     rfqById: (id: string) => `${BASE}/customer/rfq/${id}`,
     rfqCancel: (id: string) => `${BASE}/customer/rfq/${id}/cancel`,
+    loyaltyBalance: `${BASE}/retention/loyalty/balance`,
+    loyaltyPoints: `${BASE}/retention/loyalty/points`,
+    loyaltyHistory: `${BASE}/retention/loyalty/history`,
   },
   payment: {
     createOrder: `${BASE}/payment/orders`,
@@ -139,8 +140,12 @@ export const API_ENDPOINTS = {
     tickets: `${BASE}/tickets`,
   },
   newsletter: {
-    subscribe: `${BASE}/newsletter/subscribe`,
+    subscribe: `${BASE}/retention/newsletter/subscribe`,
     unsubscribe: `${BASE}/newsletter/unsubscribe`,
+  },
+  invoices: {
+    download: (invoiceNumber: string) => `${BASE}/invoices/${encodeURIComponent(invoiceNumber)}/download?view=CUSTOMER`,
+    view: (invoiceNumber: string) => `${BASE}/invoices/${encodeURIComponent(invoiceNumber)}/view`,
   },
   faqs: `${BASE}/faqs`,
 } as const;

@@ -430,6 +430,7 @@ export interface ApiOrderItem {
 export interface ApiOrder {
   _id: string;
   orderNumber?: string;
+  invoiceNumber?: string;
   customerId?: string | { _id: string; email?: string; fullName?: string; phone?: string } | null;
   vendorId?: string | { _id: string; name?: string } | null;
   items?: ApiOrderItem[];
@@ -687,29 +688,25 @@ export interface ApiFaq {
 
 export interface ApiTheme {
   id?: string;
-  panelType?: "WEB" | string;
   siteName?: string;
-  tagline?: string;
-  logoUrl?: string;
-  primaryColor?: string;
-  secondaryColor?: string;
-  backgroundColor?: string;
-  surfaceColor?: string;
-  borderColor?: string;
-  headingColor?: string;
-  textColor?: string;
-  mutedColor?: string;
-  sidebarBgColor?: string;
-  sidebarTextColor?: string;
-  sidebarActiveBgColor?: string;
-  sidebarActiveTextColor?: string;
-  sidebarHoverBgColor?: string;
-  sidebarHoverTextColor?: string;
-  sidebarFontFamily?: string;
-  sidebarBorderRadius?: string;
   fontFamily?: string;
-  headingFontFamily?: string;
-  baseFontSize?: string;
+  backgroundColor?: string;
+  textColor?: string;
+  primaryColor?: string;
+  primaryForeground?: string;
+  secondaryColor?: string;
+  secondaryForeground?: string;
+  borderColor?: string;
+  headerPromoBg?: string;
+  headerPromoText?: string;
+  headerCategoryPillBg?: string;
+  headerCategoryPillText?: string;
+  footerBg?: string;
+  footerText?: string;
+  footerBorder?: string;
+  cartBadgeBg?: string;
+  cartBadgeText?: string;
+  isActive?: boolean;
   customCss?: string;
   createdAt?: string;
   updatedAt?: string;

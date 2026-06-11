@@ -25,7 +25,7 @@ export function Newsletter() {
     setLoading(true);
     setError(null);
     try {
-      await subscribeNewsletter(trimmed);
+      await subscribeNewsletter(trimmed, "FOOTER");
       setSuccess(true);
       setEmail("");
     } catch (err: any) {

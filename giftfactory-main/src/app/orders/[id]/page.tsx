@@ -20,7 +20,7 @@ import {
   Star,
   X,
 } from "lucide-react";
-import { submitReview, fetchOrderById, fetchOrderByOrderNumber, returnRequestOrder, createSupportTicket, fetchProductById, cancelOrder, fetchProductReviews, updateReview } from "@/lib/api";
+import { submitReview, fetchOrderById, fetchOrderByOrderNumber, returnRequestOrder, createSupportTicket, fetchProductById, cancelOrder, fetchProductReviews, updateReview, downloadInvoice } from "@/lib/api";
 import { useAuthModal } from "@/provider/auth-modal-provider";
 import {
   Dialog,
@@ -647,18 +647,40 @@ export default function OrderDetailPage({
     }
   };
 
-  const handleDownloadInvoice = () => {
-    if (!order?._id) return;
+  const handleDownloadInvoice = async () => {
+    const orderNo = order?.invoiceNumber ?? order?.orderNumber ?? order?._id;
+    if (!orderNo) return;
     setDownloadingInvoice(true);
     try {
-      const win = window.open("", "_blank");
-      if (win) {
-        win.document.write(buildInvoiceHtml(order));
-        win.document.close();
-        win.print();
-      } else {
-        toast.error("Pop-up blocked. Allow pop-ups for this site to print the invoice.");
+      const res = await downloadInvoice(orderNo);
+
+      if (res?.data?.url) {
+        window.open(res.data.url, "_blank");
+        toast.success("Invoice download started");
+        return;
       }
+
+      const htmlContent = res?.data?.html || (typeof res?.data === "string" ? res.data : null);
+      if (htmlContent) {
+        const win = window.open("", "_blank");
+        if (win) {
+          win.document.write(htmlContent);
+          win.document.close();
+          win.print();
+          toast.success("Invoice generated");
+        } else {
+          toast.error("Pop-up blocked. Please allow pop-ups for this site to view the invoice.");
+        }
+        return;
+      }
+
+      // Fallback direct browser download
+      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "/api/v1";
+      window.open(`${baseUrl}/invoices/${encodeURIComponent(orderNo)}/download?view=CUSTOMER`, "_blank");
+      toast.success("Downloading invoice...");
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message || "Failed to download invoice from server");
     } finally {
       setDownloadingInvoice(false);
     }

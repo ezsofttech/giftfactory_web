@@ -47,7 +47,7 @@ export default function HomePage() {
     setNlLoading(true);
     setNlError(null);
     try {
-      await subscribeNewsletter(trimmed);
+      await subscribeNewsletter(trimmed, "FOOTER");
       setNlSuccess(true);
       setNlEmail("");
     } catch (err: any) {

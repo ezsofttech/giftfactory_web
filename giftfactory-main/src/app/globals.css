@@ -48,7 +48,18 @@
   --shadow-2xl: 0px 4px 8px 0px hsl(0 0% 0% / 0.13);
   --tracking-normal: 0rem;
   --spacing: 0.25rem;
- --font-myfont: 'coolveticaFont', sans-serif;
+  --font-myfont: 'coolveticaFont', sans-serif;
+
+  /* Gift Factory Dynamic Theme Properties */
+  --header-promo-bg: #cc176b;
+  --header-promo-fg: #ffffff;
+  --header-category-pill-bg: #fde7f3;
+  --header-category-pill-fg: #cc176b;
+  --footer-bg: #050b18;
+  --footer-fg: #cbd5e1;
+  --footer-border: #0f172a;
+  --cart-badge-bg: #cc176b;
+  --cart-badge-fg: #ffffff;
 }
 
 .dark {
@@ -131,6 +142,17 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Gift Factory Dynamic Theme Properties */
+  --color-header-promo-bg: var(--header-promo-bg);
+  --color-header-promo-fg: var(--header-promo-fg);
+  --color-header-category-pill-bg: var(--header-category-pill-bg);
+  --color-header-category-pill-fg: var(--header-category-pill-fg);
+  --color-footer-bg: var(--footer-bg);
+  --color-footer-fg: var(--footer-fg);
+  --color-footer-border: var(--footer-border);
+  --color-cart-badge-bg: var(--cart-badge-bg);
+  --color-cart-badge-fg: var(--cart-badge-fg);
 
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
