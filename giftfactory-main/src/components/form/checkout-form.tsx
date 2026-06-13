@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { MapPin, Plus, Save, Mail, Truck, CreditCard, Smartphone, Wallet, Globe, Banknote, Phone } from "lucide-react";
-import { createOrder, createOrderFromCart, fetchAddresses, addAddress, fetchProductById, deleteCart, fetchProfile, sendPhoneOtp, verifyPhoneOtp, updateProfile, validateCoupon, fetchOrders, fetchCheckoutPreview } from "@/lib/api";
+import { createOrder, createOrderFromCart, fetchAddresses, addAddress, fetchProductById, deleteCart, fetchProfile, sendPhoneOtp, verifyPhoneOtp, updateProfile, validateCoupon, fetchOrders, fetchCheckoutPreview, fetchWebCoupons } from "@/lib/api";
 import type { PaymentMethod, ApiCoupon, CreateOrderBody, CreateOrderFromCartBody } from "@/lib/api";
 import { openRazorpayCheckout } from "@/lib/payments";
 import type { ApiAddress, ApiCart, ApiCartItem, ApiProduct } from "@/types/api";
@@ -171,6 +171,31 @@ export function CheckoutForm({ carts, cartId, productMap, appliedCoupon, onCoupo
     queryFn: fetchProfile,
     enabled: !!session?.user,
   });
+
+  const { data: couponsRes } = useQuery({
+    queryKey: ["web", "coupons"],
+    queryFn: () => fetchWebCoupons({ active: true, order: "desc", sortBy: "createdAt" }),
+  });
+
+  const coupons = useMemo(() => {
+    return (couponsRes?.data ?? []) as ApiCoupon[];
+  }, [couponsRes]);
+
+  const subtotal = useMemo(() => {
+    return carts.reduce((s, c) => {
+      if (c.totalAmount != null) return s + c.totalAmount;
+      const itemsSum = c.items?.reduce((st, item) => st + (item.priceAtAddition ?? 0) * (item.quantity ?? 1), 0) ?? 0;
+      return s + itemsSum;
+    }, 0);
+  }, [carts]);
+
+  const dropdownCoupons = useMemo(() => {
+    const list = [...coupons];
+    if (appliedCoupon && !list.some((c) => c.code.toUpperCase() === appliedCoupon.code.toUpperCase())) {
+      list.push(appliedCoupon);
+    }
+    return list;
+  }, [coupons, appliedCoupon]);
 
   const profileData = (profileRes as { data?: Record<string, unknown> } | undefined)?.data;
   const rawPhone = (profileData?.phoneNumber as string | undefined)
@@ -896,72 +921,128 @@ export function CheckoutForm({ carts, cartId, productMap, appliedCoupon, onCoupo
               control={form.control}
               name="discountCode"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Coupon code</FormLabel>
-                  <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-end">
-                    <FormControl>
-                      <Input
-                        placeholder="e.g. SAVE10"
-                        {...field}
-                        disabled={!!appliedCoupon}
-                        onChange={(e) => {
-                          field.onChange(e);
-                          setCouponError(null);
-                        }}
-                        className="min-w-0 flex-1 uppercase"
-                      />
-                    </FormControl>
-                    {appliedCoupon ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="shrink-0 text-destructive border-destructive hover:bg-destructive/10"
-                        onClick={() => {
-                          onCouponChange(null);
-                          form.setValue("discountCode", "");
-                          setCouponError(null);
-                        }}
-                      >
-                        Remove
-                      </Button>
-                    ) : (
-                      <Button
-                        type="button"
-                        variant="default"
-                        className="shrink-0 bg-primary text-primary-foreground shadow-md shadow-primary/20 hover:bg-primary/90"
-                        disabled={couponValidating || !field.value?.trim()}
-                        onClick={async () => {
-                          const code = field.value?.trim();
-                          if (!code) return;
-                          setCouponValidating(true);
-                          setCouponError(null);
-                          try {
-                            const res = await validateCoupon(code);
-                            const coupon = res?.data as ApiCoupon | undefined;
-                            if (!coupon) throw new Error("Invalid coupon code");
-                            // Check min purchase
-                            const subtotal = carts.reduce((s, c) => {
-                              if (c.totalAmount != null) return s + c.totalAmount;
-                              const itemsSum = c.items?.reduce((st, item) => st + (item.priceAtAddition ?? 0) * (item.quantity ?? 1), 0) ?? 0;
-                              return s + itemsSum;
-                            }, 0);
-                            if (coupon.minPurchaseAmount > 0 && subtotal < coupon.minPurchaseAmount) {
-                              setCouponError(`Minimum order ₹${coupon.minPurchaseAmount.toLocaleString("en-IN")} required`);
-                              return;
+                <FormItem className="space-y-4">
+                  {coupons.length > 0 && (
+                    <div className="space-y-1.5">
+                      <FormLabel>Available Coupons</FormLabel>
+                      <Select
+                        value={appliedCoupon?.code || "none"}
+                        onValueChange={(val) => {
+                          if (val === "none") {
+                            onCouponChange(null);
+                            form.setValue("discountCode", "");
+                            setCouponError(null);
+                          } else {
+                            const coupon = coupons.find((c) => c.code === val);
+                            if (coupon) {
+                              if (coupon.minPurchaseAmount > 0 && subtotal < coupon.minPurchaseAmount) {
+                                setCouponError(`Minimum order ₹${coupon.minPurchaseAmount.toLocaleString("en-IN")} required for ${coupon.code}`);
+                                return;
+                              }
+                              onCouponChange(coupon);
+                              form.setValue("discountCode", coupon.code);
+                              setCouponError(null);
+                              toast.success(`Coupon ${coupon.code} applied!`);
                             }
-                            onCouponChange(coupon);
-                            toast.success("Coupon applied!");
-                          } catch (err: any) {
-                            const msg = err?.response?.data?.message ?? err?.message ?? "Invalid coupon code";
-                            setCouponError(msg);
-                          } finally {
-                            setCouponValidating(false);
                           }
                         }}
                       >
-                        {couponValidating ? "Checking…" : "Apply"}
-                      </Button>
-                    )}
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select an available coupon" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent side="bottom" align="start">
+                          <SelectItem value="none">None / Clear Coupon</SelectItem>
+                          {dropdownCoupons.map((coupon) => {
+                            const isEligible = subtotal >= coupon.minPurchaseAmount;
+                            const discountText = coupon.discountType === "percentage"
+                              ? `${coupon.discountValue}% off`
+                              : `₹${coupon.discountValue.toLocaleString("en-IN")} off`;
+                            const minOrderText = coupon.minPurchaseAmount > 0
+                              ? `Min order: ₹${coupon.minPurchaseAmount.toLocaleString("en-IN")}`
+                              : "No min order";
+                            return (
+                              <SelectItem
+                                key={coupon.id || coupon._id || coupon.code}
+                                value={coupon.code}
+                                disabled={!isEligible}
+                              >
+                                <div className="flex items-center justify-between w-full text-left gap-4">
+                                  <span className="font-semibold text-sm">{coupon.code}</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {coupon.name ? `${coupon.name} • ` : ""}{discountText} ({minOrderText})
+                                  </span>
+                                </div>
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  <div className="space-y-1.5">
+                    <FormLabel>Coupon code</FormLabel>
+                    <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-end">
+                      <FormControl>
+                        <Input
+                          placeholder="e.g. SAVE10"
+                          {...field}
+                          disabled={!!appliedCoupon}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            setCouponError(null);
+                          }}
+                          className="min-w-0 flex-1 uppercase"
+                        />
+                      </FormControl>
+                      {appliedCoupon ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="shrink-0 text-destructive border-destructive hover:bg-destructive/10"
+                          onClick={() => {
+                            onCouponChange(null);
+                            form.setValue("discountCode", "");
+                            setCouponError(null);
+                          }}
+                        >
+                          Remove
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="default"
+                          className="shrink-0 bg-primary text-primary-foreground shadow-md shadow-primary/20 hover:bg-primary/90"
+                          disabled={couponValidating || !field.value?.trim()}
+                          onClick={async () => {
+                            const code = field.value?.trim();
+                            if (!code) return;
+                            setCouponValidating(true);
+                            setCouponError(null);
+                            try {
+                              const res = await validateCoupon(code);
+                              const coupon = res?.data as ApiCoupon | undefined;
+                              if (!coupon) throw new Error("Invalid coupon code");
+                              if (coupon.minPurchaseAmount > 0 && subtotal < coupon.minPurchaseAmount) {
+                                setCouponError(`Minimum order ₹${coupon.minPurchaseAmount.toLocaleString("en-IN")} required`);
+                                return;
+                              }
+                              onCouponChange(coupon);
+                              toast.success("Coupon applied!");
+                            } catch (err: any) {
+                              const msg = err?.response?.data?.message ?? err?.message ?? "Invalid coupon code";
+                              setCouponError(msg);
+                            } finally {
+                              setCouponValidating(false);
+                            }
+                          }}
+                        >
+                          {couponValidating ? "Checking…" : "Apply"}
+                        </Button>
+                      )}
+                    </div>
                   </div>
                   {couponError && (
                     <p className="text-sm text-destructive mt-1">{couponError}</p>

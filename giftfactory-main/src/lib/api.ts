@@ -1525,11 +1525,76 @@ export interface ApiCoupon {
   minPurchaseAmount: number;
   maxDiscountAmount: number;
   isActive: boolean;
+
+  // Optional fields from new endpoints
+  id?: string;
+  name?: string;
+  type?: string;
+  scope?: string;
+  value?: string;
+  minOrderAmount?: string;
+  usageLimit?: number;
+  usedCount?: number;
+  active?: boolean;
+  startsAt?: string;
+  endsAt?: string;
+  createdAt?: string;
+}
+
+export function normalizeCoupon(c: any): ApiCoupon {
+  if (!c) return c;
+
+  let discountType: "fixed" | "percentage" = "fixed";
+  if (c.type) {
+    const t = c.type.toLowerCase();
+    if (t === "percentage") discountType = "percentage";
+  } else if (c.discountType) {
+    discountType = c.discountType.toLowerCase() === "percentage" ? "percentage" : "fixed";
+  }
+
+  const discountValue = c.value != null ? Number(c.value) : (c.discountValue != null ? Number(c.discountValue) : 0);
+  const minPurchaseAmount = c.minOrderAmount != null ? Number(c.minOrderAmount) : (c.minPurchaseAmount != null ? Number(c.minPurchaseAmount) : 0);
+  const maxDiscountAmount = c.maxDiscountAmount != null ? Number(c.maxDiscountAmount) : 0;
+  const isActive = c.active !== undefined ? c.active : (c.isActive !== undefined ? c.isActive : false);
+
+  return {
+    ...c,
+    _id: c.id || c._id || "",
+    id: c.id || c._id || "",
+    code: c.code || "",
+    discountType,
+    discountValue,
+    minPurchaseAmount,
+    maxDiscountAmount,
+    isActive,
+  };
+}
+
+export async function fetchWebCoupons(params?: {
+  order?: "asc" | "desc";
+  active?: boolean;
+  sortBy?: string;
+  page?: number;
+  limit?: number;
+}): Promise<ApiResponse<ApiCoupon[]>> {
+  const { data } = await get(API_ENDPOINTS.coupons.list, { params });
+  const rawList = data?.data ?? (Array.isArray(data) ? data : []);
+  const normalizedList = rawList.map(normalizeCoupon);
+  return {
+    ...data,
+    data: normalizedList,
+    meta: data?.meta,
+  };
 }
 
 export async function validateCoupon(code: string): Promise<ApiResponse<ApiCoupon>> {
-  const { data } = await get(API_ENDPOINTS.coupons.validate(code.trim().toUpperCase()));
-  return data;
+  const res = await get(API_ENDPOINTS.coupons.validate(code.trim().toUpperCase()));
+  const raw = res?.data ?? res;
+  const coupon = raw?.data ?? raw;
+  return {
+    ...raw,
+    data: normalizeCoupon(coupon),
+  };
 }
 
 export async function downloadInvoice(invoiceNumber: string): Promise<any> {

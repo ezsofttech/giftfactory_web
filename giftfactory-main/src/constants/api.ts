@@ -131,7 +131,8 @@ export const API_ENDPOINTS = {
     active: `${BASE}/offers/active`,
   },
   coupons: {
-    validate: (code: string) => `${BASE}/coupons/validate/${code}`,
+    list: `${BASE}/web/coupons`,
+    validate: (code: string) => `${BASE}/web/coupons/${code}`,
   },
   discounts: {
     validate: (code: string) => `${BASE}/discounts/validate/${code}`,

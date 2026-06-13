@@ -211,20 +211,8 @@ export default function LoyaltyPage() {
             </div>
 
             {/* Next tier target progress */}
-            {currentTierInfo.nextTier && (
-              <div className="space-y-2 max-w-md mx-auto md:mx-0">
-                <div className="flex justify-between text-xs font-medium text-gray-600">
-                  <span>Progress to {tierConfig[currentTierInfo.nextTier].label} Tier</span>
-                  <span>{points} / {currentTierInfo.nextPoints} pts</span>
-                </div>
-                <div className="w-full bg-gray-200/80 rounded-full h-2">
-                  <div 
-                    className="bg-primary h-2 rounded-full transition-all duration-1000 ease-out"
-                    style={{ width: `${progressToNext}%` }}
-                  />
-                </div>
-              </div>
-            )}
+          
+          
 
             {!currentTierInfo.nextTier && (
               <div className="flex items-center justify-center md:justify-start gap-1.5 text-amber-600 text-xs font-bold bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg w-max">
