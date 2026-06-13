@@ -357,240 +357,183 @@ function OrderHistoryPageContent() {
   };
 
   const renderOrderCard = (order: ApiOrder) => {
-    const firstItem = order.items?.[0] as ApiOrderItem | undefined;
-    const firstItemProduct = firstItem ? productMap.get(getOrderItemProductId(firstItem) ?? "") : undefined;
-    const firstImage = firstItem ? getOrderItemImage(firstItem, firstItemProduct) : "https://picsum.photos/seed/gift/400/400";
-    const firstTitle = firstItem ? getOrderItemTitle(firstItem) : "Order Item";
-    const firstItemProductId = firstItem ? getOrderItemProductId(firstItem) : undefined;
-    const firstVariantId =
-      firstItem?.variantId && typeof firstItem.variantId === "object"
-        ? firstItem.variantId._id
-        : typeof firstItem?.variantId === "string"
-          ? firstItem.variantId
-          : undefined;
-    const firstProductSlugOrId = firstItemProductId;
-    const firstProductUrl = firstProductSlugOrId
-      ? (firstVariantId
-        ? `/products/${encodeURIComponent(firstProductSlugOrId)}?variantId=${firstVariantId}`
-        : `/products/${encodeURIComponent(firstProductSlugOrId)}`)
-      : null;
-    const itemsCount = getOrderItemCount(order);
+    const total = order.totalAmount ?? 0;
     const vendorName = getVendorName(order);
     const customerName = getCustomerName(order);
-    const total = order.totalAmount ?? 0;
-    const statusText = formatStatus(order.status);
     const paymentStatusText = formatStatus(order.paymentStatus);
+    const orderDate = order.createdAt ? new Date(order.createdAt) : null;
+    const orderDateStr = orderDate ? orderDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
 
     return (
-      <Card key={order._id} className="hover:shadow-sm transition-shadow">
-        <CardHeader className="p-3 sm:p-4 pb-2">
-          <div className="flex justify-between items-start gap-2">
-            <div className="flex items-start gap-2.5 sm:gap-3 min-w-0 flex-1">
-              {firstProductUrl ? (
-                <Link
-                  href={firstProductUrl}
-                  className="relative h-12 w-12 sm:h-16 sm:w-16 flex-shrink-0 overflow-hidden rounded-md border ring-1 ring-transparent hover:ring-primary/40 transition-all"
-                >
-                  <Image
-                    src={firstImage}
-                    alt={firstTitle}
-                    fill
-                    className="object-cover"
-                  />
-                </Link>
-              ) : (
-                <div className="relative h-12 w-12 sm:h-16 sm:w-16 flex-shrink-0 overflow-hidden rounded-md border">
-                  <Image
-                    src={firstImage}
-                    alt={firstTitle}
-                    fill
-                    className="object-cover"
-                  />
-                </div>
+      <Card key={order._id} className="overflow-hidden border border-gray-200 bg-white rounded-xl shadow-xs">
+        {/* Order Header Summary */}
+        <div className="bg-[#f9fafb] px-4 py-3 sm:px-6 sm:py-4 border-b border-gray-200 flex flex-wrap justify-between items-center gap-3">
+          <div className="space-y-1">
+            <Link
+              href={`/orders/${order._id}`}
+              className="font-bold text-sm sm:text-base text-gray-900 hover:text-primary transition-colors hover:underline"
+            >
+              {order.orderNumber ? `Order #${order.orderNumber}` : `Order #${order._id.slice(-8).toUpperCase()}`}
+            </Link>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              {order.createdAt && (
+                <span>
+                  Ordered on: {orderDateStr}
+                </span>
               )}
-              <div className="min-w-0 flex-1">
-                <CardTitle className="text-sm sm:text-base font-semibold">
-                  {firstProductUrl ? (
-                    <Link href={firstProductUrl} className="hover:underline">
-                      {firstTitle}
-                    </Link>
-                  ) : (
-                    firstTitle
-                  )}
-                </CardTitle>
-                <div className="flex flex-wrap items-center mt-1 gap-1.5">
-                  <Badge variant={getStatusVariant(order.status)} className="text-xs">
-                    {statusText}
+              <span>•</span>
+              <span>Vendor: {vendorName}</span>
+              <span>•</span>
+              <span>Customer: {customerName}</span>
+              {isB2bOrder(order) && (
+                <>
+                  <span>•</span>
+                  <Badge variant="outline" className="text-[10px] h-4 border-primary/40 text-primary py-0 px-1">
+                    B2B
                   </Badge>
-                  <Badge variant={order.paymentStatus === "pending" ? "secondary" : "outline"} className="text-xs">
-                    Payment: {paymentStatusText}
-                  </Badge>
-                  {isB2bOrder(order) && (
-                    <Badge variant="outline" className="text-xs border-primary/40 text-primary">
-                      B2B
-                    </Badge>
-                  )}
-                  {order.createdAt && (
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Clock className="w-3 h-3 shrink-0" />
-                      <span className="hidden sm:inline">{new Date(order.createdAt).toLocaleString("en-IN", { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-                      <span className="sm:hidden">{new Date(order.createdAt).toLocaleDateString("en-IN", { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-                    </div>
-                  )}
-                </div>
-                <Link
-                  href={`/orders/${order._id}`}
-                  className="text-xs sm:text-sm text-muted-foreground mt-1 line-clamp-1 hover:text-foreground transition-colors block"
-                >
-                  {order.orderNumber ? `Order #${order.orderNumber}` : `Order #${order._id.slice(-6)}`}
-                </Link>
-              </div>
-            </div>
-            <div className="text-right shrink-0">
-              <p className="font-semibold text-sm sm:text-base">₹{total.toLocaleString()}</p>
-              <p className="text-xs text-muted-foreground mt-1">{itemsCount} item{itemsCount === 1 ? "" : "s"}</p>
+                </>
+              )}
             </div>
           </div>
-        </CardHeader>
-
-        <CardContent className="p-3 sm:p-4 pt-0">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 text-xs sm:text-sm mb-3">
-            <div className="flex items-center space-x-2">
-              <Store className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground shrink-0" />
-              <div className="min-w-0">
-                <p className="text-muted-foreground">Vendor</p>
-                <p className="truncate">{vendorName}</p>
-              </div>
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Order Total</p>
+              <p className="font-bold text-sm sm:text-base text-gray-950">₹{total.toLocaleString("en-IN")}</p>
             </div>
-            <div className="flex items-center space-x-2">
-              <User className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground shrink-0" />
-              <div className="min-w-0">
-                <p className="text-muted-foreground">Customer</p>
-                <p className="truncate">{customerName}</p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-2">
-              <CreditCard className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground shrink-0" />
-              <div>
-                <p className="text-muted-foreground">Payment</p>
-                <p className="capitalize">{order.paymentMethod ?? "—"} · {paymentStatusText}</p>
-              </div>
-            </div>
-          </div>
-
-          {!!order.items?.length && (
-            <div className="border-t pt-3 space-y-3">
-              <p className="text-xs sm:text-sm font-medium text-muted-foreground">Order Items ({order.items.length})</p>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3">
-                {order.items.map((item, idx) => {
-                  const title = getOrderItemTitle(item);
-                  const subtitle = getOrderItemSubtitle(item);
-                  const quantity = item.quantity ?? 0;
-                  const lineTotal = (item.price ?? 0) * quantity;
-                  const itemProduct = productMap.get(getOrderItemProductId(item) ?? "");
-                  const image = getOrderItemImage(item, itemProduct);
-                  const productId = getOrderItemProductId(item);
-                  const variantId = item.variantId && typeof item.variantId === "object" ? item.variantId._id : undefined;
-                  const productUrl = variantId ? `/products/${encodeURIComponent(productId ?? "")}?variantId=${variantId}` : `/products/${encodeURIComponent(productId ?? "")}`;
-                  const isDelivered = order.status === "DELIVERED";
-                  const ratingKey = `${order._id}_${productId}`;
-                  const selectedRating = selectedRatings[ratingKey] ?? 0;
-                  const isReviewed = selectedRating > 0;
-
-                  return (
-                    <div
-                      key={`${order._id}-item-${idx}`}
-                      className="bg-muted/50 rounded-lg overflow-hidden border border-border hover:border-primary/50 hover:shadow-md transition-all p-2 block group"
-                    >
-                      <Link href={productUrl} className="block">
-                        <div className="relative h-24 sm:h-28 mb-2 overflow-hidden rounded-md bg-muted">
-                          <Image
-                            src={image}
-                            alt={title}
-                            fill
-                            className="object-cover group-hover:scale-110 transition-transform duration-300"
-                          />
-                          {quantity > 1 && (
-                            <div className="absolute top-1 right-1 bg-primary text-primary-foreground text-xs font-semibold px-1.5 py-0.5 rounded-full">
-                              ×{quantity}
-                            </div>
-                          )}
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-xs sm:text-sm font-medium line-clamp-2 group-hover:text-primary transition-colors">{title}</p>
-                          {subtitle && (
-                            <p className="text-xs text-muted-foreground line-clamp-1">{subtitle}</p>
-                          )}
-                          <p className="text-xs sm:text-sm font-semibold text-primary">
-                            ₹{lineTotal.toLocaleString()}
-                          </p>
-                        </div>
-                      </Link>
-
-                      {isDelivered && productId && (
-                        <div className="mt-2 border-t border-border pt-2 space-y-1.5">
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="text-[10px] sm:text-xs font-medium text-muted-foreground">
-                              Rate this product
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            {[1, 2, 3, 4, 5].map((rating) => {
-                              const filled = selectedRating >= rating;
-                              const disabled = submittingReviewProductId === productId;
-                              return (
-                                <button
-                                  key={`${productId}-${rating}`}
-                                  type="button"
-                                  disabled={disabled}
-                                  onClick={() => {
-                                    const ratingKey = `${order._id}_${productId}`;
-                                    const existing = userReviewsMap[ratingKey];
-                                    setActiveReviewProduct({
-                                      productId: productId || "",
-                                      productTitle: title,
-                                      productImage: image,
-                                      orderId: order._id,
-                                    });
-                                    setActiveRating(rating);
-                                    setCommentText(existing?.comment || "");
-                                    setActiveReviewId(existing?.id || null);
-                                    setReviewDialogOpen(true);
-                                  }}
-                                  className="rounded-sm p-0.5 transition-transform hover:scale-110 disabled:cursor-not-allowed disabled:opacity-60"
-                                  aria-label={`Rate ${rating} star${rating === 1 ? "" : "s"}`}
-                                >
-                                  <Star className={`h-4 w-4 sm:h-5 sm:w-5 ${filled ? "fill-amber-400 text-amber-400" : "text-muted-foreground"}`} />
-                                </button>
-                              );
-                            })}
-                          </div>
-                          {isReviewed ? (
-                            <div />
-                          ) : (
-                            <p className="text-[10px] sm:text-xs text-muted-foreground">
-                              {submittingReviewProductId === productId ? "Submitting..." : "Tap a star to submit or update your rating"}
-                            </p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          <div className="flex justify-end mt-3">
-            <Button variant="outline" size="sm" asChild>
+            <Button variant="outline" size="sm" asChild className="h-8 text-xs font-semibold rounded-lg">
               <Link href={`/orders/${order._id}`}>
-                <Package className="h-4 w-4 mr-1.5" />
                 View Details
               </Link>
             </Button>
           </div>
-        </CardContent>
+        </div>
+
+        {/* Order Items List */}
+        <div className="divide-y divide-gray-150 bg-white">
+          {order.items?.map((item, idx) => {
+            const title = getOrderItemTitle(item);
+            const subtitle = getOrderItemSubtitle(item);
+            const quantity = item.quantity ?? 1;
+            const unitPrice = item.price ?? 0;
+            const lineTotal = unitPrice * quantity;
+
+            const itemProduct = productMap.get(getOrderItemProductId(item) ?? "");
+            const image = getOrderItemImage(item, itemProduct);
+            const productId = getOrderItemProductId(item);
+
+            const variantId = item.variantId && typeof item.variantId === "object" ? item.variantId._id : undefined;
+            const productUrl = productId
+              ? (variantId
+                ? `/products/${encodeURIComponent(productId)}?variantId=${variantId}`
+                : `/products/${encodeURIComponent(productId)}`)
+              : null;
+
+            const isDelivered = order.status === "DELIVERED";
+            const isCancelled = order.status === "CANCELLED" || order.status === "FAILED";
+
+            // Determine status display details
+            const dotColor = isDelivered ? "bg-emerald-500" : (isCancelled ? "bg-red-500" : "bg-amber-500");
+            const statusTitle = isDelivered
+              ? `Delivered on ${orderDateStr}`
+              : (isCancelled
+                ? `Cancelled on ${orderDateStr}`
+                : `Ordered on ${orderDateStr}`);
+
+            const statusDesc = isDelivered
+              ? "Your item has been delivered"
+              : (isCancelled
+                ? "Your item was cancelled"
+                : `Your item is in progress (Payment: ${paymentStatusText})`);
+
+            const ratingKey = `${order._id}_${productId}`;
+            const selectedRating = selectedRatings[ratingKey] ?? 0;
+
+            return (
+              <div
+                key={`${order._id}-item-${idx}`}
+                className="p-4 sm:p-6 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center hover:bg-gray-50/30 transition-colors"
+              >
+                {/* Left: Product Image & Details */}
+                <div className="flex gap-4 items-start min-w-0 flex-1">
+                  {productUrl ? (
+                    <Link
+                      href={productUrl}
+                      className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-gray-200 shadow-sm bg-gray-50 group block"
+                    >
+                      <img src={image} alt={title} className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-300" />
+                      {quantity > 1 && (
+                        <span className="absolute top-1 right-1 bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm z-10">
+                          x{quantity}
+                        </span>
+                      )}
+                    </Link>
+                  ) : (
+                    <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-gray-200 shadow-sm bg-gray-50">
+                      <img src={image} alt={title} className="object-cover w-full h-full" />
+                      {quantity > 1 && (
+                        <span className="absolute top-1 right-1 bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm z-10">
+                          x{quantity}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  <div className="min-w-0 space-y-1">
+                    <h4 className="text-sm sm:text-base font-semibold text-gray-950 line-clamp-2 leading-snug">
+                      {productUrl ? (
+                        <Link href={productUrl} className="hover:text-primary hover:underline">
+                          {title}
+                        </Link>
+                      ) : (
+                        title
+                      )}
+                    </h4>
+                    {subtitle && (
+                      <p className="text-xs text-muted-foreground font-medium">{subtitle}</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Middle: Price */}
+                <div className="shrink-0 sm:w-24 text-left sm:text-center">
+                  <span className="font-bold text-sm sm:text-base text-gray-900">₹{lineTotal.toLocaleString("en-IN")}</span>
+                </div>
+
+                {/* Right: Status & Actions */}
+                <div className="w-full sm:w-64 flex flex-col items-start sm:items-end gap-1">
+                  <div className="flex items-center gap-2">
+                    <span className={`h-2.5 w-2.5 rounded-full ${dotColor}`} />
+                    <span className="font-bold text-sm text-gray-900">{statusTitle}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground font-medium">{statusDesc}</p>
+
+                  {isDelivered && productId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const ratingKey = `${order._id}_${productId}`;
+                        const existing = userReviewsMap[ratingKey];
+                        setActiveReviewProduct({
+                          productId: productId || "",
+                          productTitle: title,
+                          productImage: image,
+                          orderId: order._id,
+                        });
+                        setActiveRating(selectedRating || 5);
+                        setCommentText(existing?.comment || "");
+                        setActiveReviewId(existing?.id || null);
+                        setReviewDialogOpen(true);
+                      }}
+                      className="flex items-center gap-1.5  font-semibold  text-xs sm:text-sm mt-1 focus:outline-none cursor-pointer"
+                    >
+                      <Star className="h-4 w-4 text-pink-600 shrink-0" />
+                      <p className="text-pink-600">Rate & Review Product</p>
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </Card>
     );
   };
@@ -662,17 +605,17 @@ function OrderHistoryPageContent() {
           </div>
         </div>
 
-      {(meta?.totalPages ?? 1) > 1 && (
-        <div className="px-4 sm:px-6 pb-4 sm:pb-6 flex items-center justify-between border-t border-border pt-4">
-          <Button variant="outline" size="sm" disabled={!canPrev} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-            Previous
-          </Button>
-          <p className="text-sm text-muted-foreground">Page {meta?.page ?? page} of {meta?.totalPages ?? 1}</p>
-          <Button variant="outline" size="sm" disabled={!canNext} onClick={() => setPage((p) => p + 1)}>
-            Next
-          </Button>
-        </div>
-      )}
+        {(meta?.totalPages ?? 1) > 1 && (
+          <div className="px-4 sm:px-6 pb-4 sm:pb-6 flex items-center justify-between border-t border-border pt-4">
+            <Button variant="outline" size="sm" disabled={!canPrev} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+              Previous
+            </Button>
+            <p className="text-sm text-muted-foreground">Page {meta?.page ?? page} of {meta?.totalPages ?? 1}</p>
+            <Button variant="outline" size="sm" disabled={!canNext} onClick={() => setPage((p) => p + 1)}>
+              Next
+            </Button>
+          </div>
+        )}
       </div>
       {/* Review Dialog with comment field */}
       <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
@@ -773,10 +716,10 @@ function OrderHistoryPageContent() {
                   disabled={submittingReviewProductId === activeReviewProduct.productId}
                   className="bg-[#cc176b] hover:bg-[#cc176b]/95 text-white rounded-xl h-10 px-5 font-semibold"
                 >
-                  {submittingReviewProductId === activeReviewProduct.productId 
-                    ? "Saving..." 
-                    : activeReviewId 
-                      ? "Update Review" 
+                  {submittingReviewProductId === activeReviewProduct.productId
+                    ? "Saving..."
+                    : activeReviewId
+                      ? "Update Review"
                       : "Submit Review"}
                 </Button>
               </DialogFooter>

@@ -57,7 +57,7 @@ interface OrderSummaryProps {
 
 export function OrderSummary({ carts, productMap = new Map(), appliedCoupon }: OrderSummaryProps) {
   const subtotal = carts.reduce((sum, cart) => {
-    if (cart.totalAmount != null) return sum + cart.totalAmount;
+    if (cart.totalAmount != null) return sum + Number(cart.totalAmount);
     const itemsSum = cart.items?.reduce((s, item) => s + (item.priceAtAddition ?? 0) * (item.quantity ?? 1), 0) ?? 0;
     return sum + itemsSum;
   }, 0);

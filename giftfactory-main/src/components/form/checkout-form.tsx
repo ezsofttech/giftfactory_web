@@ -183,7 +183,7 @@ export function CheckoutForm({ carts, cartId, productMap, appliedCoupon, onCoupo
 
   const subtotal = useMemo(() => {
     return carts.reduce((s, c) => {
-      if (c.totalAmount != null) return s + c.totalAmount;
+      if (c.totalAmount != null) return s + Number(c.totalAmount);
       const itemsSum = c.items?.reduce((st, item) => st + (item.priceAtAddition ?? 0) * (item.quantity ?? 1), 0) ?? 0;
       return s + itemsSum;
     }, 0);

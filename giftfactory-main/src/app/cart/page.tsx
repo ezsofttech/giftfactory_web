@@ -320,10 +320,10 @@ export default function CartPage() {
   const totalItems = carts.reduce((sum, c) => sum + (c.itemsCount ?? c.items?.length ?? 0), 0);
   const grandTotal = status === "authenticated"
     ? carts.reduce((sum, c) => {
-        if (c.totalAmount != null) return sum + c.totalAmount;
-        const itemsSum = c.items?.reduce((s, item) => s + (item.priceAtAddition ?? 0) * (item.quantity ?? 1), 0) ?? 0;
-        return sum + itemsSum;
-      }, 0)
+      if (c.totalAmount != null) return sum + Number(c.totalAmount);
+      const itemsSum = c.items?.reduce((s, item) => s + (item.priceAtAddition ?? 0) * (item.quantity ?? 1), 0) ?? 0;
+      return sum + itemsSum;
+    }, 0)
     : guestTotal;
 
   const activeTotalItems = status === "authenticated" ? totalItems : guestItems.length;
@@ -357,9 +357,9 @@ export default function CartPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left Column: Cart Items List (70% width) */}
         <div className="lg:col-span-8 space-y-6">
-          
-        
-        
+
+
+
 
           {/* List Section */}
           <div className="space-y-6">
@@ -389,18 +389,18 @@ export default function CartPage() {
                             : (item.productId as ApiProduct)?._id ?? "";
                       const display = getProductDisplay(item);
                       const fetchedProduct = productId ? productMap.get(productId) : undefined;
-                      
+
                       const productInfo = fetchedProduct
                         ? (() => {
-                            const p = fetchedProduct as ApiProduct & Record<string, unknown>;
-                            const d = mapApiProductToDisplay(fetchedProduct);
-                            const thumb = getProductImageUrl(p) || d.thumbnail || "";
-                            return {
-                              id: d.id,
-                              title: d.title,
-                              thumbnail: thumb.trim() || "https://picsum.photos/seed/gift/400/400",
-                            };
-                          })()
+                          const p = fetchedProduct as ApiProduct & Record<string, unknown>;
+                          const d = mapApiProductToDisplay(fetchedProduct);
+                          const thumb = getProductImageUrl(p) || d.thumbnail || "";
+                          return {
+                            id: d.id,
+                            title: d.title,
+                            thumbnail: thumb.trim() || "https://picsum.photos/seed/gift/400/400",
+                          };
+                        })()
                         : display;
 
                       const variantObj =
@@ -468,7 +468,7 @@ export default function CartPage() {
                               </div>
                             </div>
                           </div>
-                          
+
                           {/* Right layout: Title, ratings, prices, WOW promo, etc. */}
                           <div className="flex-1 min-w-0 space-y-1.5 pr-12">
                             <p className="font-semibold text-gray-950 text-sm sm:text-base leading-snug line-clamp-2">
@@ -597,7 +597,7 @@ export default function CartPage() {
                           </div>
                         </div>
                       </div>
-                      
+
                       {/* Right layout: Details */}
                       <div className="flex-1 min-w-0 space-y-1.5 pr-12">
                         <p className="font-semibold text-gray-950 text-sm sm:text-base leading-snug line-clamp-2">
@@ -672,7 +672,7 @@ export default function CartPage() {
 
         {/* Right Column: Sticky Summary Card (30% width) */}
         <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-6">
-          
+
           {/* Guest Sign-in Promotion */}
           {status !== "authenticated" && (
             <div className="bg-gradient-to-br from-violet-500 to-indigo-600 rounded-3xl p-5 text-white shadow-xl shadow-indigo-500/10 space-y-3 relative overflow-hidden">
@@ -701,16 +701,16 @@ export default function CartPage() {
               <Award className="h-5 w-5 text-pink-500" />
               Order Summary
             </h2>
-            
+
             <div className="space-y-3.5 text-sm text-gray-600 border-b border-gray-100 pb-5">
               <div className="flex justify-between items-center">
                 <span>Subtotal ({activeTotalItems} items)</span>
                 <span className="font-bold text-gray-900">₹{grandTotal.toLocaleString()}</span>
               </div>
-              
+
             </div>
 
-            
+
 
             <div className="space-y-4 pt-1">
               <div className="flex justify-between items-end border-t border-gray-100 pt-4">
