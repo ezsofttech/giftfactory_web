@@ -524,7 +524,10 @@ export default function ProductPage({
         },
       }).then((res) => {
         const cartId = (res as any)?.data?._id ?? (res as any)?._id ?? (res as any)?.data?.id ?? (res as any)?.id;
-        if (cartId) saveGuestCartId(cartId);
+        if (cartId) {
+          saveGuestCartId(cartId);
+          queryClient.invalidateQueries({ queryKey: ["guest", "cart"] });
+        }
       }).catch((err) => {
         console.error("Failed to sync guest cart item add to backend:", err);
       });
@@ -565,6 +568,7 @@ export default function ProductPage({
         });
       }
       mergeCartIntoCache(queryClient, res);
+      queryClient.invalidateQueries({ queryKey: ["customer", "cart"] });
       toast.success(`Added ${effectiveQuantity} to cart`);
     } catch (err: any) {
       const msg = err?.response?.data?.message ?? err?.message ?? "Failed to add to cart";

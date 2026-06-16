@@ -61,7 +61,7 @@ export function OrderSummary({ carts, productMap = new Map(), appliedCoupon }: O
     const itemsSum = cart.items?.reduce((s, item) => s + (item.priceAtAddition ?? 0) * (item.quantity ?? 1), 0) ?? 0;
     return sum + itemsSum;
   }, 0);
-  const shipping: number = 0;
+  const shipping = subtotal < 1500 ? 99 : 0;
 
   const discountAmount = appliedCoupon
     ? appliedCoupon.discountType === "percentage"

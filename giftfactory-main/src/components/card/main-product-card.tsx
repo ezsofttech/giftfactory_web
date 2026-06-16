@@ -191,7 +191,10 @@ export function ProductCard({ product, className, showDescription = false }: Pro
         },
       }).then((res) => {
         const cartId = (res as any)?.data?._id ?? (res as any)?._id ?? (res as any)?.data?.id ?? (res as any)?.id;
-        if (cartId) saveGuestCartId(cartId);
+        if (cartId) {
+          saveGuestCartId(cartId);
+          queryClient.invalidateQueries({ queryKey: ["guest", "cart"] });
+        }
       }).catch((err) => {
         console.error("Failed to sync guest cart item add to backend:", err);
       });
@@ -235,6 +238,7 @@ export function ProductCard({ product, className, showDescription = false }: Pro
           item: { productId: String(product.id), variantId: product.preVariantId, quantity: 1 },
         });
         mergeCartIntoCache(queryClient, res);
+        queryClient.invalidateQueries({ queryKey: ["customer", "cart"] });
         toast(
           <div className="flex flex-col gap-3 w-full">
             <div className="flex items-center gap-3">
@@ -299,6 +303,7 @@ export function ProductCard({ product, className, showDescription = false }: Pro
         });
       }
       mergeCartIntoCache(queryClient, res);
+      queryClient.invalidateQueries({ queryKey: ["customer", "cart"] });
       toast(
         <div className="flex flex-col gap-3 w-full">
           <div className="flex items-center gap-3">
@@ -383,6 +388,7 @@ export function ProductCard({ product, className, showDescription = false }: Pro
         });
       }
       mergeCartIntoCache(queryClient, res);
+      queryClient.invalidateQueries({ queryKey: ["customer", "cart"] });
 
       // Then redirect to checkout
       router.push(`/checkout`);

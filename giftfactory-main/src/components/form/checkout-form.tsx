@@ -26,8 +26,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { MapPin, Plus, Save, Mail, Truck, CreditCard, Smartphone, Wallet, Globe, Banknote, Phone } from "lucide-react";
-import { createOrder, createOrderFromCart, fetchAddresses, addAddress, fetchProductById, deleteCart, fetchProfile, sendPhoneOtp, verifyPhoneOtp, updateProfile, validateCoupon, fetchOrders, fetchCheckoutPreview, fetchWebCoupons } from "@/lib/api";
+import { MapPin, Plus, Save, Mail, Truck, CreditCard, Smartphone, Wallet, Globe, Banknote, Phone, Coins, Sparkles } from "lucide-react";
+import { createOrder, createOrderFromCart, fetchAddresses, addAddress, fetchProductById, deleteCart, fetchProfile, sendPhoneOtp, verifyPhoneOtp, updateProfile, validateCoupon, fetchOrders, fetchCheckoutPreview, fetchWebCoupons, fetchLoyaltyBalance, redeemLoyaltyPoints } from "@/lib/api";
 import type { PaymentMethod, ApiCoupon, CreateOrderBody, CreateOrderFromCartBody } from "@/lib/api";
 import { openRazorpayCheckout } from "@/lib/payments";
 import type { ApiAddress, ApiCart, ApiCartItem, ApiProduct } from "@/types/api";
@@ -177,6 +177,16 @@ export function CheckoutForm({ carts, cartId, productMap, appliedCoupon, onCoupo
     queryFn: () => fetchWebCoupons({ active: true, order: "desc", sortBy: "createdAt" }),
   });
 
+  const { data: loyaltyRes, refetch: refetchLoyalty } = useQuery({
+    queryKey: ["customer", "loyalty", "balance"],
+    queryFn: fetchLoyaltyBalance,
+    enabled: !!session?.user,
+  });
+
+  const [loyaltyPointsInput, setLoyaltyPointsInput] = useState<string>("");
+  const [loyaltyRedeemLoading, setLoyaltyRedeemLoading] = useState(false);
+  const [loyaltyError, setLoyaltyError] = useState<string | null>(null);
+
   const coupons = useMemo(() => {
     return (couponsRes?.data ?? []) as ApiCoupon[];
   }, [couponsRes]);
@@ -191,10 +201,10 @@ export function CheckoutForm({ carts, cartId, productMap, appliedCoupon, onCoupo
 
   const dropdownCoupons = useMemo(() => {
     const list = [...coupons];
-    if (appliedCoupon && !list.some((c) => c.code.toUpperCase() === appliedCoupon.code.toUpperCase())) {
+    if (appliedCoupon && appliedCoupon.code && !list.some((c) => c.code.toUpperCase() === appliedCoupon.code.toUpperCase())) {
       list.push(appliedCoupon);
     }
-    return list;
+    return list.filter((c) => c && typeof c.code === "string" && c.code.trim() !== "");
   }, [coupons, appliedCoupon]);
 
   const profileData = (profileRes as { data?: Record<string, unknown> } | undefined)?.data;
@@ -392,6 +402,85 @@ export function CheckoutForm({ carts, cartId, productMap, appliedCoupon, onCoupo
     }
   }
 
+  async function handleRedeemLoyalty() {
+    const points = parseInt(loyaltyPointsInput, 10);
+    const available = loyaltyRes?.data?.points ?? 0;
+    
+    const allowedPoints = [100, 250, 500, 1000];
+    if (isNaN(points) || points < 100 || !allowedPoints.includes(points)) {
+      setLoyaltyError("Points must be one of the following values: 100, 250, 500, 1000");
+      return;
+    }
+    
+    if (points > available) {
+      setLoyaltyError(`You cannot redeem more than your available balance of ${available} coins.`);
+      return;
+    }
+
+    if (points > subtotal) {
+      setLoyaltyError(`You cannot redeem more coins than the subtotal amount of ₹${subtotal}.`);
+      return;
+    }
+
+    if (appliedCoupon) {
+      setLoyaltyError("Please remove the currently applied coupon/discount before redeeming loyalty coins.");
+      return;
+    }
+
+    setLoyaltyRedeemLoading(true);
+    setLoyaltyError(null);
+
+    try {
+      const res = await redeemLoyaltyPoints(points);
+      const rawRes = res as any;
+      const couponCode = rawRes?.data?.code ?? rawRes?.code ?? (typeof rawRes?.data === "string" ? rawRes.data : undefined);
+
+      if (!couponCode) {
+        throw new Error("API did not return a valid coupon code.");
+      }
+
+      // Try validating via validateCoupon API to get full metadata (discountType, discountValue, etc.)
+      try {
+        const validated = await validateCoupon(couponCode);
+        if (validated?.data) {
+          onCouponChange(validated.data);
+        } else {
+          throw new Error("Could not validate coupon");
+        }
+      } catch (valErr) {
+        console.warn("Coupon validation failed, using fallback coupon object:", valErr);
+        // Fallback to manually constructing a coupon object if validation isn't available/fails
+        const couponDetails = rawRes?.data?.coupon ?? rawRes?.coupon ?? rawRes?.data;
+        const discountVal = (couponDetails && typeof couponDetails === "object")
+          ? Number(couponDetails.discountValue ?? couponDetails.value ?? points)
+          : points;
+
+        onCouponChange({
+          _id: couponCode,
+          id: couponCode,
+          code: couponCode,
+          discountType: "fixed",
+          discountValue: discountVal,
+          minPurchaseAmount: 0,
+          maxDiscountAmount: 0,
+          isActive: true,
+        });
+      }
+
+      form.setValue("discountCode", couponCode);
+      toast.success(`Successfully redeemed ${points} coins! Discount coupon applied.`);
+      setLoyaltyPointsInput("");
+      
+      // Invalidate query to refresh remaining coins balance
+      void refetchLoyalty();
+    } catch (err: any) {
+      const msg = err?.response?.data?.message ?? err?.message ?? "Failed to redeem loyalty points.";
+      setLoyaltyError(msg);
+      toast.error(msg);
+    } finally {
+      setLoyaltyRedeemLoading(false);
+    }
+  }
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     const activeCarts = cartId ? carts.filter((c) => c._id === cartId) : carts;
@@ -1060,6 +1149,72 @@ export function CheckoutForm({ carts, cartId, productMap, appliedCoupon, onCoupo
               )}
             />
           </div>
+
+          {/* ── Loyalty Points ── */}
+          {loyaltyRes?.data && loyaltyRes.data.points > 0 && (
+            <div className="rounded-xl border bg-white p-5 sm:p-6 shadow-sm space-y-4">
+              <div className="flex items-center gap-2 pb-1 border-b">
+                <Coins className="h-5 w-5 text-amber-500 animate-pulse" />
+                <h3 className="font-semibold text-base">SuperCoins / Loyalty Points</h3>
+                <span className="ml-auto text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200/50 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                  <Sparkles className="h-3 w-3 text-amber-500" />
+                  {loyaltyRes.data.points} Coins Available
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Redeem your available SuperCoins as a cash discount on this order. 1 Coin = ₹1 cash discount.
+                </p>
+
+                {appliedCoupon ? (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3 text-xs text-amber-700 flex items-start gap-2">
+                    <span className="font-semibold">Note:</span>
+                    <span>
+                      A discount/coupon (<span className="font-bold">{appliedCoupon.code}</span>) is currently applied. Remove it in the promo card above if you wish to redeem loyalty points instead.
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                      <div className="flex-1 space-y-1.5">
+                        <label htmlFor="loyaltyPoints" className="text-xs font-medium text-muted-foreground">
+                          Points to Redeem
+                        </label>
+                        <Input
+                          id="loyaltyPoints"
+                          type="number"
+                          placeholder="Enter 100, 250, 500, or 1000"
+                          value={loyaltyPointsInput}
+                          onChange={(e) => {
+                            setLoyaltyPointsInput(e.target.value);
+                            setLoyaltyError(null);
+                          }}
+                          className="min-w-0"
+                          disabled={loyaltyRedeemLoading}
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        onClick={handleRedeemLoyalty}
+                        disabled={
+                          loyaltyRedeemLoading || 
+                          !loyaltyPointsInput.trim()
+                        }
+                        className="shrink-0 bg-primary text-primary-foreground shadow-md hover:bg-primary/90"
+                      >
+                        {loyaltyRedeemLoading ? "Redeeming..." : "Redeem Coins"}
+                      </Button>
+                    </div>
+
+                    {loyaltyError && (
+                      <p className="text-xs text-destructive mt-1 font-medium">{loyaltyError}</p>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* ── Fulfillment Option ── */}
           <div className="rounded-xl border bg-white p-5 sm:p-6 shadow-sm space-y-4">

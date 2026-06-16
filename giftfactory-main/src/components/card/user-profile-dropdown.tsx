@@ -37,7 +37,7 @@ export const UserProfileDropdown = () => {
             <button type="button" className="flex flex-col items-center text-foreground hover:text-primary transition-colors cursor-pointer">
               <Avatar className="h-6 w-6 ring-1 ring-border/50">
                 <AvatarImage
-                  src={session.data?.user?.image || "/default-avatar.png"}
+                  src={session.data?.user?.image || undefined}
                   alt={session.data?.user?.name || "User"}
                 />
                 <AvatarFallback className="text-[10px] font-semibold bg-muted">

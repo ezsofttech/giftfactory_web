@@ -126,6 +126,8 @@ export default function CartPage() {
       };
     },
     enabled: status === "authenticated" || (status === "unauthenticated" && !!guestCartId),
+    staleTime: 0,
+    refetchOnMount: true,
   });
 
   // Recommended products for empty state
@@ -707,7 +709,14 @@ export default function CartPage() {
                 <span>Subtotal ({activeTotalItems} items)</span>
                 <span className="font-bold text-gray-900">₹{grandTotal.toLocaleString()}</span>
               </div>
-
+              <div className="flex justify-between items-center">
+                <span>Shipping Fee</span>
+                {neededAmount === 0 ? (
+                  <span className="font-bold text-green-600">FREE</span>
+                ) : (
+                  <span className="font-bold text-gray-900">₹99</span>
+                )}
+              </div>
             </div>
 
 

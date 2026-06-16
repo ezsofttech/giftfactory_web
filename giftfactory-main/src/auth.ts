@@ -96,7 +96,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
               id: String(userId),
               email,
               name: name ?? email,
-              image: data.image ?? null,
+              image: data.avatar || data.image || null,
               accessToken,
               refreshToken,
               userId: String(userId),
@@ -129,7 +129,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
             id: String(userId),
             email,
             name: name ?? email,
-            image: data.image ?? null,
+            image: data.avatar || data.image || null,
             accessToken,
             refreshToken,
             userId: String(userId),
@@ -144,12 +144,13 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
   callbacks: {
     async jwt({ token, user, trigger, session }) {
       if (user) {
-        const u = user as { userId?: string; id?: string; accessToken?: string; refreshToken?: string; name?: string; customerId?: string };
+        const u = user as { userId?: string; id?: string; accessToken?: string; refreshToken?: string; name?: string; customerId?: string; image?: string };
         token.userId = u.userId ?? u.id;
         token.accessToken = u.accessToken;
         token.refreshToken = u.refreshToken;
         token.name = u.name;
         token.customerId = u.customerId;
+        token.picture = u.image;
 
         // Decode expiration
         const exp = u.accessToken ? getJwtExp(u.accessToken) : null;
@@ -231,6 +232,10 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
             const profileName = profile.name || profile.fullName;
             if (profileName && session.user) {
               session.user.name = profileName;
+            }
+            const avatarUrl = profile.avatar || profile.image || profile.imageUrl;
+            if (avatarUrl && session.user) {
+              session.user.image = avatarUrl;
             }
           }
         } catch (err) {

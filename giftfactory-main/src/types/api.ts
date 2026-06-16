@@ -443,6 +443,7 @@ export interface ApiOrder {
   vendorPayableAmount?: number;
   paymentMethod?: string;
   paymentStatus?: string;
+  onlinePaymentStatus?: string;
   paymentId?: string;
   vendorSettlementStatus?: string;
   status: OrderStatus;

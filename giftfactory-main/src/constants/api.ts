@@ -109,6 +109,7 @@ export const API_ENDPOINTS = {
     loyaltyBalance: `${BASE}/retention/loyalty/balance`,
     loyaltyPoints: `${BASE}/retention/loyalty/points`,
     loyaltyHistory: `${BASE}/retention/loyalty/history`,
+    loyaltyRedeem: `${BASE}/retention/loyalty/redeem`,
   },
   payment: {
     createOrder: `${BASE}/payment/orders`,

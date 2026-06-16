@@ -976,6 +976,7 @@ export function normalizeOrder(o: any): ApiOrder {
     totalAmount: totalVal,
     discountAmount: discountVal,
     items: itemsMapped,
+    paymentStatus: o.paymentStatus || o.onlinePaymentStatus,
   };
 }
 
@@ -1662,4 +1663,9 @@ export async function fetchLoyaltyHistory(): Promise<ApiResponse<{
       balance: 0
     }
   };
+}
+
+export async function redeemLoyaltyPoints(points: number): Promise<ApiResponse<{ code: string; discountValue?: number; [key: string]: any }>> {
+  const { data } = await post(API_ENDPOINTS.customer.loyaltyRedeem, { points });
+  return data;
 }

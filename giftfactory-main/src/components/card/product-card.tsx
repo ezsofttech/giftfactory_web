@@ -50,7 +50,10 @@ export function ProductCard({ product }: { product: ProductDisplay }) {
         },
       }).then((res) => {
         const cartId = (res as any)?.data?._id ?? (res as any)?._id ?? (res as any)?.data?.id ?? (res as any)?.id;
-        if (cartId) saveGuestCartId(cartId);
+        if (cartId) {
+          saveGuestCartId(cartId);
+          queryClient.invalidateQueries({ queryKey: ["guest", "cart"] });
+        }
       }).catch((err) => {
         console.error("Failed to sync guest cart item add to backend:", err);
       });
@@ -65,6 +68,7 @@ export function ProductCard({ product }: { product: ProductDisplay }) {
           item: { productId: String(product.id), variantId: product.preVariantId, quantity: 1 },
         });
         mergeCartIntoCache(queryClient, res);
+        queryClient.invalidateQueries({ queryKey: ["customer", "cart"] });
         toast.success("Added to cart");
         return;
       }
@@ -105,6 +109,7 @@ export function ProductCard({ product }: { product: ProductDisplay }) {
         },
       });
       mergeCartIntoCache(queryClient, res);
+      queryClient.invalidateQueries({ queryKey: ["customer", "cart"] });
       toast.success("Added to cart");
     } catch (err: any) {
       const msg = err?.response?.data?.message ?? err?.message ?? "Failed to add to cart";
