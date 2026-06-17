@@ -31,6 +31,11 @@ import type { ApiCategory, ApiProduct, ApiBrand } from "@/types/api";
 import { mapApiProductToDisplay } from "@/types/api";
 import { ProductCard } from "@/components/card/main-product-card";
 import { Button } from "@/components/ui/button";
+import { useSession } from "next-auth/react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuthModal } from "@/provider/auth-modal-provider";
+import { toggleWishlistItem, fetchWishlistIds } from "@/lib/api";
+import { toast } from "sonner";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. SERVICES GRID SECTION
@@ -456,6 +461,59 @@ export function FeaturedBrands({ brands }: { brands: ApiBrand[] }) {
 // ─────────────────────────────────────────────────────────────────────────────
 export function TrendingAndWhy({ products, categories }: { products: ApiProduct[], categories: ApiCategory[] }) {
   const [activeTab, setActiveTab] = useState("all");
+  const { data: session, status } = useSession();
+  const { openAuthModal } = useAuthModal();
+  const queryClient = useQueryClient();
+
+  const customerId = session?.userId;
+  const { data: wishlistIdsRes } = useQuery({
+    queryKey: ["customer", "wishlist", "ids", customerId],
+    queryFn: () => fetchWishlistIds(customerId as string),
+    enabled: status === "authenticated" && !!customerId,
+  });
+
+  const wishlistIds = (wishlistIdsRes?.data ?? []) as Array<string | { productId: string; variantId?: string }>;
+
+  const toggleWishlistMutation = useMutation({
+    mutationFn: toggleWishlistItem,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["customer", "wishlist"] });
+      queryClient.invalidateQueries({ queryKey: ["customer", "wishlist", "ids"] });
+    },
+    onError: () => toast.error("Failed to update wishlist"),
+  });
+
+  const handleToggleWishlist = (e: React.MouseEvent, productId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (status !== "authenticated") {
+      openAuthModal({ message: "Sign in to save items to your wishlist" });
+      return;
+    }
+
+    const isCurrentlyWishlisted = wishlistIds.some((item) => {
+      if (typeof item === "string") {
+        return item === productId;
+      } else if (item && typeof item === "object") {
+        return item.productId === productId && !item.variantId;
+      }
+      return false;
+    });
+
+    toggleWishlistMutation.mutate(
+      { productId },
+      {
+        onSuccess: () => {
+          if (isCurrentlyWishlisted) {
+            toast.success("Removed from wishlist");
+          } else {
+            toast.success("Added to wishlist");
+          }
+        },
+      }
+    );
+  };
 
   const filteredProducts = activeTab === "all"
     ? products.slice(0, 4)
@@ -511,39 +569,56 @@ export function TrendingAndWhy({ products, categories }: { products: ApiProduct[
               <p className="text-sm text-gray-500 py-6">No trending products available in this category.</p>
             ) : (
               <div className="divide-y divide-gray-100">
-                {displayProducts.map((p) => (
-                  <Link 
-                    key={p.id}
-                    href={`/products/${p.id}`}
-                    className="flex items-center gap-4 py-4 hover:bg-gray-50/50 transition-colors px-2 rounded-xl group cursor-pointer"
-                  >
-                    <div className="relative w-16 h-16 bg-gray-50 border border-gray-100 rounded-lg overflow-hidden shrink-0">
-                      <img src={p.thumbnail || "https://picsum.photos/seed/gift/100/100"} alt={p.title} className="w-full h-full object-cover" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-bold text-sm text-gray-900 truncate group-hover:text-[#cc176b] transition-colors">{p.title}</h4>
-                      <div className="flex items-center gap-1.5 mt-1.5">
-                        <div className="flex items-center text-yellow-400">
-                          <Star className="h-3 w-3 fill-current" />
-                          <span className="text-xs font-bold text-gray-700 ml-0.5">{p.rating.toFixed(1)}</span>
+                {displayProducts.map((p) => {
+                  const isWishlisted = wishlistIds.some((item) => {
+                    if (typeof item === "string") {
+                      return item === p.id;
+                    } else if (item && typeof item === "object") {
+                      return item.productId === p.id && !item.variantId;
+                    }
+                    return false;
+                  });
+
+                  return (
+                    <Link 
+                      key={p.id}
+                      href={`/products/${p.id}`}
+                      className="flex items-center gap-4 py-4 hover:bg-gray-50/50 transition-colors px-2 rounded-xl group cursor-pointer"
+                    >
+                      <div className="relative w-16 h-16 bg-gray-50 border border-gray-100 rounded-lg overflow-hidden shrink-0">
+                        <img src={p.thumbnail || "https://picsum.photos/seed/gift/100/100"} alt={p.title} className="w-full h-full object-cover" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-bold text-sm text-gray-900 truncate group-hover:text-[#cc176b] transition-colors">{p.title}</h4>
+                        <div className="flex items-center gap-1.5 mt-1.5">
+                          <div className="flex items-center text-yellow-400">
+                            <Star className="h-3 w-3 fill-current" />
+                            <span className="text-xs font-bold text-gray-700 ml-0.5">{p.rating.toFixed(1)}</span>
+                          </div>
+                          <span className="text-xs text-gray-500">({p.reviewCount ?? 0})</span>
                         </div>
-                        <span className="text-xs text-gray-500">({p.reviewCount ?? 0})</span>
+                        <div className="flex items-baseline gap-2 mt-1">
+                          <span className="text-sm font-black text-[#cc176b]">₹{p.price.toLocaleString("en-IN")}</span>
+                          {p.mrp && p.mrp > p.price && (
+                            <span className="text-xs text-gray-400 line-through">₹{p.mrp.toLocaleString("en-IN")}</span>
+                          )}
+                          {p.discountPercentage > 0 && (
+                            <span className="text-[10px] bg-red-50 text-red-500 font-bold px-1 rounded">-{p.discountPercentage}%</span>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-baseline gap-2 mt-1">
-                        <span className="text-sm font-black text-[#cc176b]">₹{p.price.toLocaleString("en-IN")}</span>
-                        {p.mrp && p.mrp > p.price && (
-                          <span className="text-xs text-gray-400 line-through">₹{p.mrp.toLocaleString("en-IN")}</span>
-                        )}
-                        {p.discountPercentage > 0 && (
-                          <span className="text-[10px] bg-red-50 text-red-500 font-bold px-1 rounded">-{p.discountPercentage}%</span>
-                        )}
-                      </div>
-                    </div>
-                    <button className="p-2 text-gray-400 hover:text-red-500">
-                      <Heart className="h-5 w-5" />
-                    </button>
-                  </Link>
-                ))}
+                      <button 
+                        onClick={(e) => handleToggleWishlist(e, p.id)}
+                        disabled={toggleWishlistMutation.isPending}
+                        className={`p-2 transition-colors duration-200 cursor-pointer disabled:opacity-50 ${
+                          isWishlisted ? "text-red-500 hover:text-red-600" : "text-gray-400 hover:text-red-500"
+                        }`}
+                      >
+                        <Heart className="h-5 w-5" fill={isWishlisted ? "currentColor" : "none"} />
+                      </button>
+                    </Link>
+                  );
+                })}
               </div>
             )}
           </div>

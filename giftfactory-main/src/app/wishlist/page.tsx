@@ -12,7 +12,7 @@ import { fetchWishlist, fetchProductById, toggleWishlistItem } from "@/lib/api";
 import { mapApiProductToDisplay } from "@/types/api";
 import type { ApiWishlistItem, ApiProduct, ApiProductVariant, ProductDisplay } from "@/types/api";
 import { toast } from "sonner";
-import { Trash2 } from "lucide-react";
+import { Trash2,Heart } from "lucide-react";
 
 
 export default function WishlistPage() {
@@ -141,8 +141,8 @@ export default function WishlistPage() {
   return (
     <div className="flex min-h-screen container mx-auto">
       <main className="flex-1 p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">Your Wishlist</h1>
+        <div className="flex justify-between items-center mb-6 ">
+          <h1 className="text-2xl font-bold flex items-center gap-2"><Heart color="#C61666"  fill="#C61666" size={30}/>Your Wishlist</h1>
         </div>
 
         {productsLoading ? (
@@ -151,7 +151,7 @@ export default function WishlistPage() {
           </div>
         ) : displayItems.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-lg text-gray-500">Your wishlist is empty</p>
+            <p className="text-lg text-gray-500 flex items-center justify-center gap-2 "><Heart color="#C61666"size={20}/>Your wishlist is empty</p>
             <Button className="mt-4" asChild>
               <Link href="/products">Continue Shopping</Link>
             </Button>
