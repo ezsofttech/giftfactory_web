@@ -6,11 +6,14 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   async rewrites() {
-    const base = (
+    let base = (
       process.env.NEXT_PUBLIC_API_BASE_URL?.trim() ||
       (process.env.NODE_ENV === "development" ? "http://localhost:9873" : "")
     ).replace(/\/+$/, "");
     if (!base) return { afterFiles: [] };
+    if (base.endsWith("/api/v1")) {
+      base = base.slice(0, -8);
+    }
     return {
       afterFiles: [
         {

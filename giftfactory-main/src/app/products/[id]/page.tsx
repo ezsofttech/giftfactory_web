@@ -116,11 +116,8 @@ export default function ProductPage({
   });
 
   const { data: recommendedRes, isLoading: recommendedLoading } = useQuery({
-    queryKey: status === "authenticated" ? ["customer", "recommended", session?.userId] : ["web", "products", "recommended"],
-    queryFn: () =>
-      status === "authenticated"
-        ? fetchCustomerRecommended({ limit: 16, customerId: session?.userId })
-        : fetchProductRecommended({ limit: 16 }),
+    queryKey: ["web", "products", "recommended", status, session?.userId],
+    queryFn: () => fetchProductRecommended({ limit: 16 }),
     enabled: !!productId,
   });
 
@@ -220,13 +217,13 @@ export default function ProductPage({
       const firstVariant = populatedVariants[0] as any;
       const sellingPrice =
         firstVariant?.price?.sellingPrice != null ? Number(firstVariant.price.sellingPrice)
-        : product.price?.sellingPrice != null ? Number(product.price.sellingPrice)
-        : typeof product.defaultPrice === "number" ? product.defaultPrice
-        : Number(product.defaultPrice) || 0;
+          : product.price?.sellingPrice != null ? Number(product.price.sellingPrice)
+            : typeof product.defaultPrice === "number" ? product.defaultPrice
+              : Number(product.defaultPrice) || 0;
       const mrpPrice =
         firstVariant?.price?.mrp != null ? Number(firstVariant.price.mrp)
-        : product.price?.mrp != null ? Number(product.price.mrp)
-        : undefined;
+          : product.price?.mrp != null ? Number(product.price.mrp)
+            : undefined;
 
       trackRecentlyViewed({
         id: product._id,
@@ -354,7 +351,7 @@ export default function ProductPage({
         return false;
       });
       setInWishlist(matches);
-    }).catch(() => {});
+    }).catch(() => { });
   }, [status, product?._id, session?.userId, selectedVariant?._id]);
 
   if (isLoading) {
@@ -1073,24 +1070,24 @@ export default function ProductPage({
               </div>
               <p className="text-sm text-muted-foreground mb-3">{reviewCount} global ratings</p>
               {reviews.length > 0 && (
-              <div className="space-y-1.5">
-                {[5, 4, 3, 2, 1].map((stars) => {
-                  const count = reviews.filter((r) => Math.round(r.rating) === stars).length;
-                  const pct = reviews.length ? (count / reviews.length) * 100 : 0;
-                  return (
-                    <div key={stars} className="flex items-center gap-2 text-sm">
-                      <span className="w-8">{stars} star</span>
-                      <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-primary rounded-full"
-                          style={{ width: `${pct}%` }}
-                        />
+                <div className="space-y-1.5">
+                  {[5, 4, 3, 2, 1].map((stars) => {
+                    const count = reviews.filter((r) => Math.round(r.rating) === stars).length;
+                    const pct = reviews.length ? (count / reviews.length) * 100 : 0;
+                    return (
+                      <div key={stars} className="flex items-center gap-2 text-sm">
+                        <span className="w-8">{stars} star</span>
+                        <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-primary rounded-full"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <span className="text-muted-foreground w-8">{count}</span>
                       </div>
-                      <span className="text-muted-foreground w-8">{count}</span>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
           )}

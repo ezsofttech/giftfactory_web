@@ -521,7 +521,7 @@ export function ProductCard({ product, className, showDescription = false }: Pro
             </div>
           )}
 
-          {product.availabilityStatus !== "out_of_stock" && !(product.stock != null && product.stock === 0) && (
+          {product.price != null && (
             <div className="mb-1">
               <div className="flex items-baseline gap-1 sm:gap-1.5 flex-wrap">
                 <span className="font-bold text-foreground text-sm sm:text-lg">

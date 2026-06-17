@@ -19,8 +19,11 @@ import {
   Download,
   Star,
   X,
+  Trash2,
+  ImagePlus,
+  Loader2,
 } from "lucide-react";
-import { submitReview, fetchOrderById, fetchOrderByOrderNumber, returnRequestOrder, createSupportTicket, fetchProductById, cancelOrder, fetchProductReviews, updateReview, downloadInvoice } from "@/lib/api";
+import { submitReview, fetchOrderById, fetchOrderByOrderNumber, returnRequestOrder, createOnlineReturnRequestV2, uploadReturnImage, createSupportTicket, fetchProductById, cancelOrder, fetchProductReviews, updateReview, downloadInvoice, fetchReturnRequestByOrderNumber, fetchReturnRequestV2Detail, fetchReturnRequestsV2 } from "@/lib/api";
 import { useAuthModal } from "@/provider/auth-modal-provider";
 import {
   Dialog,
@@ -34,7 +37,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import type { ApiAddress, ApiOrder, ApiOrderItem, ApiProduct } from "@/types/api";
-import { apiAddressPostalCode, apiAddressStreet } from "@/types/api";
+import { apiAddressPostalCode, apiAddressStreet, getValidImageUrl } from "@/types/api";
 
 const TRACKING_STAGES = [
   { key: "placed", label: "Order Placed", icon: ShoppingCart, status: "CREATED" },
@@ -84,12 +87,13 @@ function isStageReached(order: ApiOrder, stageStatus: string): boolean {
   );
   if (statusTransitions.has(stageStatus)) return true;
 
-  const idx = STATUS_ORDER.indexOf(order.status);
+  const oStatus = order.status?.toUpperCase().trim() ?? "";
+  const idx = STATUS_ORDER.indexOf(oStatus);
   const stageIdx = STATUS_ORDER.indexOf(stageStatus);
-  if (idx < 0 || stageIdx < 0) return stageStatus === order.status;
+  if (idx < 0 || stageIdx < 0) return stageStatus === oStatus;
 
   // Terminal states still keep previously reached logistics milestones.
-  if (order.status === "CANCELLED" || order.status === "FAILED" || order.status === "PAYMENT_FAILED") {
+  if (oStatus === "CANCELLED" || oStatus === "FAILED" || oStatus === "PAYMENT_FAILED") {
     if (stageStatus === "CREATED") return true;
     return statusTransitions.has(stageStatus);
   }
@@ -100,7 +104,7 @@ function isStageReached(order: ApiOrder, stageStatus: string): boolean {
 function getOrderItemImage(item: ApiOrderItem): string {
   const variant = item.variantId && typeof item.variantId === "object" ? item.variantId : null;
   if (Array.isArray(variant?.images) && variant.images.length && typeof variant.images[0] === "string") {
-    return variant.images[0];
+    return getValidImageUrl(variant.images[0]);
   }
   const fromProductLike = (p: unknown): string | undefined => {
     if (!p || typeof p !== "object") return undefined;
@@ -114,9 +118,9 @@ function getOrderItemImage(item: ApiOrderItem): string {
     return undefined;
   };
   const variantProductImage = fromProductLike(variant?.productId);
-  if (variantProductImage) return variantProductImage;
+  if (variantProductImage) return getValidImageUrl(variantProductImage);
   const productImage = fromProductLike(item.productId);
-  if (productImage) return productImage;
+  if (productImage) return getValidImageUrl(productImage);
   return "https://picsum.photos/seed/gift/400/400";
 }
 
@@ -137,12 +141,12 @@ function getOrderItemProductId(item: ApiOrderItem): string | undefined {
 function getProductImageFromApiProduct(product?: ApiProduct): string | undefined {
   if (!product) return undefined;
   const base = product.baseImageUrl;
-  if (Array.isArray(base) && base.length > 0 && typeof base[0] === "string") return base[0];
-  if (typeof base === "string" && base) return base;
+  if (Array.isArray(base) && base.length > 0 && typeof base[0] === "string") return getValidImageUrl(base[0]);
+  if (typeof base === "string" && base) return getValidImageUrl(base);
   const rec = product as unknown as Record<string, unknown>;
-  if (typeof rec.thumbnail === "string" && rec.thumbnail) return rec.thumbnail;
-  if (typeof rec.imageUrl === "string" && rec.imageUrl) return rec.imageUrl;
-  if (typeof rec.image === "string" && rec.image) return rec.image;
+  if (typeof rec.thumbnail === "string" && rec.thumbnail) return getValidImageUrl(rec.thumbnail);
+  if (typeof rec.imageUrl === "string" && rec.imageUrl) return getValidImageUrl(rec.imageUrl);
+  if (typeof rec.image === "string" && rec.image) return getValidImageUrl(rec.image);
   return undefined;
 }
 
@@ -205,14 +209,14 @@ function buildInvoiceHtml(order: ApiOrder): string {
   const orderNo = escapeHtml(order.orderNumber ?? order._id);
   const dateStr = order.createdAt
     ? escapeHtml(
-        new Date(order.createdAt).toLocaleString("en-IN", {
-          day: "numeric",
-          month: "short",
-          year: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-      )
+      new Date(order.createdAt).toLocaleString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    )
     : "—";
 
   const cust = order.customerId;
@@ -343,10 +347,9 @@ function buildInvoiceHtml(order: ApiOrder): string {
 
   <div class="box" style="margin-top:16px;">
     <h3 style="margin:0 0 10px;font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:0.06em;">Shipping address</h3>
-    ${
-      addrLines.length
-        ? addrLines.map((line) => `<p style="margin:4px 0;font-size:14px;line-height:1.45;">${line}</p>`).join("")
-        : `<p style="margin:0;color:#9ca3af;">No address on file</p>`
+    ${addrLines.length
+      ? addrLines.map((line) => `<p style="margin:4px 0;font-size:14px;line-height:1.45;">${line}</p>`).join("")
+      : `<p style="margin:0;color:#9ca3af;">No address on file</p>`
     }
   </div>
 
@@ -418,9 +421,39 @@ export default function OrderDetailPage({
     queryFn: () =>
       isId ? fetchOrderById(idOrNumber) : fetchOrderByOrderNumber(idOrNumber),
     enabled: sessionStatus === "authenticated",
+    staleTime: 2000,
+    refetchInterval: (query) => {
+      const order = (query.state.data as any)?.data as ApiOrder | undefined;
+      if (!order) return false;
+      const isPending =
+        (order.paymentStatus?.toUpperCase() === "PENDING" ||
+          order.paymentStatus?.toUpperCase() === "CREATED") &&
+        order.paymentMethod?.toUpperCase() !== "COD";
+      return isPending ? 3000 : false;
+    },
   });
 
   const order = orderRes?.data as ApiOrder | undefined;
+
+  const { data: returnsV2ListRes } = useQuery({
+    queryKey: ["customer", "order", order?.orderNumber, "returns-v2-list"],
+    queryFn: () => fetchReturnRequestsV2({ orderNumber: order?.orderNumber ?? "" }),
+    enabled: !!order?.orderNumber && sessionStatus === "authenticated",
+    retry: false,
+  });
+
+  const returnsList = returnsV2ListRes?.data as any[] | undefined;
+  const returnReqFromOrder = Array.isArray(returnsList) && returnsList.length > 0 ? returnsList[0] : undefined;
+  const returnNumber = returnReqFromOrder?.returnNumber || returnReqFromOrder?.id || returnReqFromOrder?._id;
+
+  const { data: returnDetailRes } = useQuery({
+    queryKey: ["customer", "return-v2", returnNumber],
+    queryFn: () => fetchReturnRequestV2Detail(returnNumber ?? ""),
+    enabled: !!returnNumber && sessionStatus === "authenticated",
+    retry: false,
+  });
+
+  const returnDetails = returnDetailRes?.data || returnReqFromOrder;
   const productIds = useMemo(() => {
     const ids = new Set<string>();
     (order?.items ?? []).forEach((it) => {
@@ -522,6 +555,15 @@ export default function OrderDetailPage({
   const [returnRequestType, setReturnRequestType] = useState<"return" | "exchange">("return");
   const [returnReason, setReturnReason] = useState("");
   const [returnComment, setReturnComment] = useState("");
+  const [returnItem, setReturnItem] = useState<{
+    productId: string;
+    variantId?: string | null;
+    quantity: number;
+    title: string;
+    image?: string;
+  } | null>(null);
+  const [returnImages, setReturnImages] = useState<{ url: string; key: string }[]>([]);
+  const [uploadingImages, setUploadingImages] = useState(false);
   const [supportDialogOpen, setSupportDialogOpen] = useState(false);
   const [supportSubject, setSupportSubject] = useState("");
   const [supportDescription, setSupportDescription] = useState("");
@@ -538,17 +580,23 @@ export default function OrderDetailPage({
     setActiveReviewId(existing?.id || null);
   };
 
-  const returnRequestMutation = useMutation({
-    mutationFn: (payload: { requestType: "return" | "refund"; reason: string; comment?: string }) =>
-      returnRequestOrder(order?.orderNumber ?? order?._id ?? idOrNumber, payload),
+  const returnRequestV2Mutation = useMutation({
+    mutationFn: createOnlineReturnRequestV2,
     onSuccess: () => {
-      toast.success("Return/Exchange request submitted");
+      toast.success("Return/Exchange request submitted successfully");
       setReturnDialogOpen(false);
       setReturnReason("");
       setReturnComment("");
+      setReturnItem(null);
+      setReturnImages([]);
+      queryClient.invalidateQueries({ queryKey: ["customer", "order", idOrNumber] });
+      if (order?.orderNumber) {
+        queryClient.invalidateQueries({ queryKey: ["customer", "order", order.orderNumber, "returns-v2-list"] });
+      }
+      queryClient.invalidateQueries({ queryKey: ["customer", "return-v2"] });
     },
     onError: (err: any) => {
-      const msg = err?.response?.data?.message || err?.message || "Failed to submit request";
+      const msg = err?.response?.data?.message || err?.message || "Failed to submit return request";
       toast.error(msg);
     },
   });
@@ -576,17 +624,63 @@ export default function OrderDetailPage({
     },
   });
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploadingImages(true);
+    try {
+      const newImages: { url: string; key: string }[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const res = await uploadReturnImage(file);
+        if (res.data?.url && res.data?.key) {
+          newImages.push({ url: res.data.url, key: res.data.key });
+        }
+      }
+      if (newImages.length > 0) {
+        setReturnImages((prev) => [...prev, ...newImages]);
+        toast.success("Images uploaded successfully");
+      } else {
+        toast.error("Failed to upload images");
+      }
+    } catch (err: any) {
+      const msg = err?.response?.data?.message ?? err?.message ?? "Failed to upload images";
+      toast.error(msg);
+    } finally {
+      setUploadingImages(false);
+    }
+  };
+
+  const handleRemoveImage = (indexToRemove: number) => {
+    setReturnImages((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+  };
+
   const submitReturnOrExchange = () => {
     const trimmedReason = returnReason.trim();
     if (!trimmedReason) {
       toast.error("Please enter a reason");
       return;
     }
-    // Backend supports return/refund; map exchange flow to return with explicit reason.
-    returnRequestMutation.mutate({
-      requestType: "return",
-      reason: returnRequestType === "exchange" ? `Exchange request: ${trimmedReason}` : trimmedReason,
-      comment: returnComment.trim() || undefined,
+    if (!returnItem) {
+      toast.error("No item selected for return");
+      return;
+    }
+
+    returnRequestV2Mutation.mutate({
+      orderNumber: order?.orderNumber ?? order?._id ?? idOrNumber,
+      returnType: returnRequestType === "exchange" ? "EXCHANGE" : "RETURN",
+      reason: trimmedReason,
+      remarks: returnComment.trim() || undefined,
+      items: [
+        {
+          productId: returnItem.productId,
+          variantId: returnItem.variantId || null,
+          requestedQty: returnItem.quantity,
+          remarks: returnComment.trim() || undefined,
+        },
+      ],
+      images: returnImages.map((img) => img.key),
     });
   };
 
@@ -757,12 +851,13 @@ export default function OrderDetailPage({
   const shippingValue = order.shippingFee ?? Math.max(total - subtotal, 0);
   const shippingLabel = shippingValue > 0 ? shippingValue.toLocaleString("en-IN") : "—";
 
+  const orderStatusUpper = order.status?.toUpperCase().trim();
   const canCancel =
     order &&
-    order.status !== "CANCELLED" &&
-    order.status !== "DELIVERED" &&
-    order.status !== "SHIPPED" &&
-    order.status !== "OUT_FOR_DELIVERY" &&
+    orderStatusUpper !== "CANCELLED" &&
+    orderStatusUpper !== "DELIVERED" &&
+    orderStatusUpper !== "SHIPPED" &&
+    orderStatusUpper !== "OUT_FOR_DELIVERY" &&
     order.paymentStatus?.toUpperCase() !== "PAID" &&
     order.paymentStatus?.toUpperCase() !== "COMPLETED";
 
@@ -846,9 +941,9 @@ export default function OrderDetailPage({
               </div>
 
               <h3 className="text-sm font-semibold text-foreground mb-2">Order Tracking</h3>
-              {(order.status === "CANCELLED" || order.status === "FAILED" || order.status === "PAYMENT_FAILED") && (
+              {(orderStatusUpper === "CANCELLED" || orderStatusUpper === "FAILED" || orderStatusUpper === "PAYMENT_FAILED") && (
                 <p className="text-xs text-destructive mb-3">
-                  This order is {order.status.toLowerCase().replace(/_/g, " ")}.
+                  This order is {order.status?.toLowerCase().replace(/_/g, " ")}.
                 </p>
               )}
               {(order.trackingNumber || order.trackingUrl) && (
@@ -903,6 +998,137 @@ export default function OrderDetailPage({
             </CardContent>
           </Card>
 
+          {returnDetails && (
+            <Card className="border-pink-200 bg-pink-50/20 shadow-sm overflow-hidden">
+              <CardContent className="p-4 sm:p-6 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-pink-100/60 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-pink-100 rounded-lg text-pink-700">
+                      <Package className="h-5 w-5 animate-pulse" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-base text-foreground">
+                        {returnDetails.returnType === "EXCHANGE" ? "Exchange Request" : "Return Request"}
+                      </h3>
+                      <p className="text-xs text-muted-foreground mt-0.5 font-medium">
+                        #{returnDetails.returnNumber} • Submitted {returnDetails.createdAt ? new Date(returnDetails.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "just now"}
+                      </p>
+                    </div>
+                  </div>
+                  <span className={`text-[10px] sm:text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${
+                    returnDetails.status?.toUpperCase() === "PENDING" || returnDetails.status?.toUpperCase() === "REQUESTED"
+                      ? "bg-amber-100 text-amber-800 border border-amber-200"
+                      : returnDetails.status?.toUpperCase() === "APPROVED" || returnDetails.status?.toUpperCase() === "ACCEPTED"
+                      ? "bg-blue-100 text-blue-800 border border-blue-200"
+                      : returnDetails.status?.toUpperCase() === "REJECTED" || returnDetails.status?.toUpperCase() === "FAILED"
+                      ? "bg-red-100 text-red-800 border border-red-200"
+                      : "bg-green-100 text-green-800 border border-green-200"
+                  }`}>
+                    {returnDetails.status?.replace(/_/g, " ")}
+                  </span>
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="font-semibold text-muted-foreground block text-xs uppercase tracking-wide">Reason</span>
+                    <span className="font-medium text-foreground mt-1 block">{returnDetails.reason}</span>
+                  </div>
+                  {returnDetails.remarks && (
+                    <div>
+                      <span className="font-semibold text-muted-foreground block text-xs uppercase tracking-wide">Customer Remarks</span>
+                      <span className="text-foreground mt-1 block italic text-xs leading-relaxed bg-white/50 p-2 rounded border border-pink-100/40">
+                        "{returnDetails.remarks}"
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Returned Items */}
+                {Array.isArray(returnDetails.items) && returnDetails.items.length > 0 && (
+                  <div className="border-t border-pink-100/40 pt-3">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Items Requesting Return/Exchange</h4>
+                    <div className="space-y-2">
+                      {returnDetails.items.map((item: any, i: number) => {
+                        const productInfo = productMap.get(item.productId);
+                        const title = item.product?.name || productInfo?.title || item.productName || "Product Item";
+                        const imageUrl = getValidImageUrl(productInfo?.thumbnail || item.imageUrl || "https://picsum.photos/seed/gift/400/400");
+                        return (
+                          <div key={i} className="flex items-center gap-3 bg-white p-2.5 rounded-lg border border-pink-100/40 hover:border-pink-200 transition-colors">
+                            <div className="relative w-12 h-12 rounded overflow-hidden shrink-0 border bg-muted">
+                              <Image src={imageUrl} alt={title} fill className="object-cover" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-sm text-foreground truncate">{title}</p>
+                              {item.remarks && <p className="text-xs text-muted-foreground italic mt-0.5">"{item.remarks}"</p>}
+                            </div>
+                            <div className="text-xs font-bold text-muted-foreground shrink-0 bg-muted px-2.5 py-1 rounded">
+                              Qty: {item.requestedQty || item.quantity || 1}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Return Images Gallery */}
+                {(() => {
+                  let parsedImages: string[] = [];
+                  if (returnDetails.images) {
+                    if (typeof returnDetails.images === "string") {
+                      try {
+                        parsedImages = JSON.parse(returnDetails.images);
+                      } catch {
+                        const cleaned = returnDetails.images.trim();
+                        if (cleaned.startsWith("[") && cleaned.endsWith("]")) {
+                          try {
+                            parsedImages = cleaned
+                              .slice(1, -1)
+                              .split(",")
+                              .map((s: string) => s.trim().replace(/^["']|["']$/g, ""));
+                          } catch {
+                            parsedImages = [returnDetails.images];
+                          }
+                        } else {
+                          parsedImages = [returnDetails.images];
+                        }
+                      }
+                    } else if (Array.isArray(returnDetails.images)) {
+                      parsedImages = returnDetails.images;
+                    }
+                  }
+                  if (parsedImages.length === 0) return null;
+                  return (
+                    <div className="border-t border-pink-100/40 pt-3">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Customer Attachments</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {parsedImages.map((img: string, i: number) => {
+                          const imgUrl = getValidImageUrl(img);
+                          return (
+                            <a
+                              key={i}
+                              href={imgUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="relative w-16 h-16 rounded-lg overflow-hidden border border-pink-100 bg-white shrink-0 hover:ring-2 hover:ring-primary/50 transition-all cursor-zoom-in group"
+                            >
+                              <Image
+                                src={imgUrl}
+                                alt={`Attachment ${i + 1}`}
+                                fill
+                                className="object-cover group-hover:scale-105 transition-transform duration-300"
+                              />
+                            </a>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="border-border">
             <CardContent className="p-4 sm:p-6">
               <h3 className="text-sm font-semibold text-foreground mb-4">Items from the order</h3>
@@ -927,7 +1153,7 @@ export default function OrderDetailPage({
 
                       const title = (item as any).productName || (product && typeof product === "object" && "title" in product ? product.title : "Product");
                       const fallbackProduct = productMap.get(getOrderItemProductId(item) ?? "");
-                      const primaryThumb = (item as any).imageUrl || getOrderItemImage(item);
+                      const primaryThumb = getValidImageUrl((item as any).imageUrl || getOrderItemImage(item));
                       const thumb = primaryThumb.includes("picsum.photos/seed/gift")
                         ? (getProductImageFromApiProduct(fallbackProduct) ?? primaryThumb)
                         : primaryThumb;
@@ -959,10 +1185,23 @@ export default function OrderDetailPage({
                                     <p className="text-xs text-muted-foreground">Variant: {variantTitle}</p>
                                   )}
                                   <p className="text-xs text-muted-foreground">Qty: {qty} × ₹{price.toLocaleString("en-IN")}</p>
+                                  {(() => {
+                                    const isReturnedItem = returnDetails?.items?.find(
+                                      (ri: any) => ri.productId === getOrderItemProductId(item)
+                                    );
+                                    if (!isReturnedItem) return null;
+                                    return (
+                                      <div className="mt-1">
+                                        <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-pink-100 text-pink-800 uppercase tracking-wider border border-pink-200">
+                                          {returnDetails.returnType === "EXCHANGE" ? "Exchange Requested" : "Return Requested"}
+                                        </span>
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                               </div>
                             </Link>
-                            {order.status === "DELIVERED" && (
+                            {orderStatusUpper === "DELIVERED" && (
                               <div className="mt-2 flex flex-wrap gap-2">
                                 {product?._id && (
                                   (() => {
@@ -979,36 +1218,57 @@ export default function OrderDetailPage({
                                     );
                                   })()
                                 )}
+                                {!returnDetails && (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      className="h-8 text-xs font-semibold rounded-lg bg-pink-600 hover:bg-pink-700 text-white hover:text-white border-none"
+                                      onClick={() => {
+                                        const prodId = getOrderItemProductId(item) || "";
+                                        const varId = item.variantId && typeof item.variantId === "object" ? item.variantId._id : (typeof item.variantId === "string" ? item.variantId : null);
+                                        setReturnItem({
+                                          productId: prodId,
+                                          variantId: varId,
+                                          quantity: qty || 1,
+                                          title,
+                                          image: thumb,
+                                        });
+                                        setReturnRequestType("return");
+                                        setReturnReason("");
+                                        setReturnComment("");
+                                        setReturnImages([]);
+                                        setReturnDialogOpen(true);
+                                      }}
+                                    >
+                                      Return
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      className="h-8 text-xs font-semibold rounded-lg bg-pink-600 hover:bg-pink-700 text-white hover:text-white border-none"
+                                      onClick={() => {
+                                        const prodId = getOrderItemProductId(item) || "";
+                                        const varId = item.variantId && typeof item.variantId === "object" ? item.variantId._id : (typeof item.variantId === "string" ? item.variantId : null);
+                                        setReturnItem({
+                                          productId: prodId,
+                                          variantId: varId,
+                                          quantity: qty || 1,
+                                          title,
+                                          image: thumb,
+                                        });
+                                        setReturnRequestType("exchange");
+                                        setReturnReason("");
+                                        setReturnComment("");
+                                        setReturnImages([]);
+                                        setReturnDialogOpen(true);
+                                      }}
+                                    >
+                                      Exchange
+                                    </Button>
+                                  </>
+                                )}
                                 <Button
-                                  variant="outline"
                                   size="sm"
-                                  className="h-7 text-xs"
-                                  onClick={() => {
-                                    setReturnRequestType("return");
-                                    setReturnReason("");
-                                    setReturnComment("");
-                                    setReturnDialogOpen(true);
-                                  }}
-                                >
-                                  Return
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-7 text-xs"
-                                  onClick={() => {
-                                    setReturnRequestType("exchange");
-                                    setReturnReason("");
-                                    setReturnComment("");
-                                    setReturnDialogOpen(true);
-                                  }}
-                                >
-                                  Exchange
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-7 text-xs"
+                                  className="h-8 text-xs font-semibold rounded-lg bg-pink-600 hover:bg-pink-700 text-white hover:text-white border-none"
                                   onClick={() => {
                                     setSupportSubject(`Order issue: ${order.orderNumber ?? order._id}`);
                                     setSupportDescription("");
@@ -1114,38 +1374,115 @@ export default function OrderDetailPage({
       </Dialog>
 
       <Dialog open={returnDialogOpen} onOpenChange={setReturnDialogOpen}>
-        <DialogContent className="sm:max-w-[480px]">
+        <DialogContent className="sm:max-w-[480px] rounded-2xl">
           <DialogHeader>
             <DialogTitle>{returnRequestType === "exchange" ? "Request Exchange" : "Request Return"}</DialogTitle>
             <DialogDescription>
               We will review your request and update the status in your order timeline.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3 py-1">
+          <div className="space-y-4 py-2">
+            {/* Selected Item Context */}
+            {returnItem && (
+              <div className="flex items-center gap-3 p-3 rounded-xl border bg-muted/20">
+                {returnItem.image && (
+                  <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-muted shrink-0 border">
+                    <img src={returnItem.image} alt={returnItem.title} className="object-cover w-full h-full" />
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold text-foreground line-clamp-1">{returnItem.title}</p>
+                  <p className="text-[11px] text-muted-foreground">Qty: {returnItem.quantity}</p>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-1">
-              <label className="text-sm font-medium">Reason</label>
+              <label className="text-sm font-semibold">Reason *</label>
               <Input
                 value={returnReason}
                 onChange={(e) => setReturnReason(e.target.value)}
                 placeholder={returnRequestType === "exchange" ? "Wrong size / color, want exchange" : "Product damaged / not as expected"}
               />
             </div>
+
             <div className="space-y-1">
-              <label className="text-sm font-medium">Comment (optional)</label>
+              <label className="text-sm font-semibold">Remarks (optional)</label>
               <Textarea
                 value={returnComment}
                 onChange={(e) => setReturnComment(e.target.value)}
-                rows={4}
-                placeholder="Add extra details"
+                rows={3}
+                placeholder="Add extra details to help speed up approval"
+                className="resize-none"
               />
             </div>
+
+            {/* Images Upload Section */}
+            <div className="space-y-2">
+              <label className="text-sm font-semibold">Attach Product Images (optional)</label>
+
+              {returnImages.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-1">
+                  {returnImages.map((img, idx) => (
+                    <div key={idx} className="relative w-16 h-16 rounded-lg overflow-hidden border bg-muted group">
+                      <img src={img.url} alt="Return attachment preview" className="object-cover w-full h-full" />
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveImage(idx)}
+                        className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                      >
+                        <Trash2 className="h-4 w-4 text-white" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 h-9"
+                  disabled={uploadingImages}
+                  onClick={() => document.getElementById("return-image-upload")?.click()}
+                >
+                  {uploadingImages ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <ImagePlus className="h-3.5 w-3.5" />
+                  )}
+                  {uploadingImages ? "Uploading..." : "Upload Image"}
+                </Button>
+                <input
+                  id="return-image-upload"
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={handleImageUpload}
+                  disabled={uploadingImages}
+                />
+              </div>
+            </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setReturnDialogOpen(false)} disabled={returnRequestMutation.isPending}>
+          <DialogFooter className="gap-2 sm:gap-0 pt-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setReturnDialogOpen(false);
+                setReturnItem(null);
+                setReturnImages([]);
+              }}
+              disabled={returnRequestV2Mutation.isPending || uploadingImages}
+            >
               Cancel
             </Button>
-            <Button onClick={submitReturnOrExchange} disabled={returnRequestMutation.isPending}>
-              {returnRequestMutation.isPending ? "Submitting..." : "Submit Request"}
+            <Button
+              onClick={submitReturnOrExchange}
+              disabled={returnRequestV2Mutation.isPending || uploadingImages}
+            >
+              {returnRequestV2Mutation.isPending ? "Submitting..." : "Submit Request"}
             </Button>
           </DialogFooter>
         </DialogContent>

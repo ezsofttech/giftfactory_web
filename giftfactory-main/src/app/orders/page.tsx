@@ -27,8 +27,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
 function getStatusVariant(status: string) {
-  if (status === "DELIVERED" || status === "CONFIRMED") return "default";
-  if (status === "CANCELLED" || status === "FAILED") return "destructive";
+  const s = status?.toUpperCase().trim();
+  if (s === "DELIVERED" || s === "CONFIRMED") return "default";
+  if (s === "CANCELLED" || s === "FAILED") return "destructive";
   return "secondary";
 }
 
@@ -214,6 +215,18 @@ function OrderHistoryPageContent() {
         order: "desc",
       }),
     enabled: status === "authenticated",
+    staleTime: 2000,
+    refetchInterval: (query) => {
+      const orders = (query.state.data as any)?.data as ApiOrder[] | undefined;
+      if (!orders || !Array.isArray(orders)) return false;
+      const hasPending = orders.some(
+        (order) =>
+          (order.paymentStatus?.toUpperCase() === "PENDING" ||
+            order.paymentStatus?.toUpperCase() === "CREATED") &&
+          order.paymentMethod?.toUpperCase() !== "COD"
+      );
+      return hasPending ? 3000 : false;
+    },
   });
 
   const orders = (res?.data ?? []) as ApiOrder[];
@@ -400,7 +413,7 @@ function OrderHistoryPageContent() {
               <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Order Total</p>
               <p className="font-bold text-sm sm:text-base text-gray-950">₹{total.toLocaleString("en-IN")}</p>
             </div>
-            <Button variant="outline" size="sm" asChild className="h-8 text-xs font-semibold rounded-lg">
+            <Button size="sm" asChild className="h-8 text-xs font-semibold rounded-lg bg-pink-600 hover:bg-pink-700 text-white hover:text-white border-none">
               <Link href={`/orders/${order._id}`}>
                 View Details
               </Link>
@@ -428,8 +441,9 @@ function OrderHistoryPageContent() {
                 : `/products/${encodeURIComponent(productId)}`)
               : null;
 
-            const isDelivered = order.status === "DELIVERED";
-            const isCancelled = order.status === "CANCELLED" || order.status === "FAILED";
+            const statusUpper = order.status?.toUpperCase().trim();
+            const isDelivered = statusUpper === "DELIVERED";
+            const isCancelled = statusUpper === "CANCELLED" || statusUpper === "FAILED";
 
             // Determine status display details
             const dotColor = isDelivered ? "bg-emerald-500" : (isCancelled ? "bg-red-500" : "bg-amber-500");
@@ -622,6 +636,7 @@ function OrderHistoryPageContent() {
         <DialogContent className="sm:max-w-md rounded-2xl bg-background border border-border shadow-xl">
           {activeReviewProduct && (
             <form
+              className="w-full min-w-0"
               onSubmit={(e) => {
                 e.preventDefault();
                 handleReviewSubmit(
@@ -644,7 +659,7 @@ function OrderHistoryPageContent() {
 
               <div className="space-y-4 py-4">
                 {/* Product Detail */}
-                <div className="bg-muted/40 p-3 rounded-xl border border-border flex items-center gap-3">
+                <div className="bg-muted/40 p-3 rounded-xl border border-border flex items-center gap-3 w-full min-w-0">
                   <div className="relative h-12 w-12 overflow-hidden rounded bg-muted shrink-0">
                     <Image
                       src={activeReviewProduct.productImage}

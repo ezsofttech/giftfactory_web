@@ -98,6 +98,7 @@ export const API_ENDPOINTS = {
     notifications: `${BASE}/notifications`,
     notificationRead: (id: string) => `${BASE}/notifications/${encodeURIComponent(id)}/read`,
     avatarUpload: `${BASE}/uploads/customer/avtar`,
+    returnUpload: `${BASE}/uploads/return`,
     searchHistory: `${BASE}/customer/search-history`,
     searchHistoryClearAll: `${BASE}/customer/search-history/all`,
     searchHistoryDelete: (id: string) => `${BASE}/customer/search-history/${id}`,
@@ -114,6 +115,9 @@ export const API_ENDPOINTS = {
   payment: {
     createOrder: `${BASE}/payment/orders`,
     verifyPayment: `${BASE}/payment/verify`,
+    returnsV2Online: `${BASE}/returns-v2/online`,
+    returnsV2List: `${BASE}/returns-v2`,
+    returnsV2Detail: (returnNumber: string) => `${BASE}/returns-v2/${encodeURIComponent(returnNumber)}`,
     capture: `${BASE}/payment/capture`,
     webhook: `${BASE}/payment/webhook`,
     getOrder: (id: string) => `${BASE}/payment/order/${id}`,

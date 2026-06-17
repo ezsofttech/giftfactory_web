@@ -370,7 +370,19 @@ export async function fetchProductDeals(params?: { limit?: number }): Promise<Ap
 export async function fetchProductRecommended(params?: { limit?: number }): Promise<ApiResponse<CustomerRecommendedResponse>> {
   const res = await get(API_ENDPOINTS.web.productRecommended, { params: params ?? {} });
   const raw = res?.data ?? res;
-  const list = Array.isArray(raw) ? raw : (raw as { data?: any[] })?.data ?? [];
+  const inner = (raw as { data?: any })?.data ?? raw;
+  
+  if (inner && typeof inner === "object" && "products" in inner) {
+    return {
+      data: {
+        products: normalizeProducts(inner.products),
+        personalized: inner.personalized ?? false,
+        reason: inner.reason ?? 'Trending products',
+      },
+    };
+  }
+  
+  const list = Array.isArray(inner) ? inner : [];
   return {
     data: {
       products: normalizeProducts(list),
@@ -699,6 +711,18 @@ export async function uploadAvatar(file: File): Promise<ApiResponse<{ url: strin
   const formData = new FormData();
   formData.append("file", file);
   const { data } = await post(API_ENDPOINTS.customer.avatarUpload, formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+  return data;
+}
+
+/** Upload product images for returns (auth required). */
+export async function uploadReturnImage(file: File): Promise<ApiResponse<{ url: string; key: string }>> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const { data } = await post(API_ENDPOINTS.customer.returnUpload, formData, {
     headers: {
       "Content-Type": "multipart/form-data",
     },
@@ -1143,6 +1167,43 @@ export async function returnRequestOrder(
   body: { requestType: ReturnRequestType; reason: string; comment?: string }
 ): Promise<ApiResponse<unknown>> {
   const { data } = await post(API_ENDPOINTS.customer.orderReturnRequest(orderId), body);
+  return data;
+}
+
+export interface ReturnRequestItemV2 {
+  productId: string;
+  variantId?: string | null;
+  requestedQty: number;
+  remarks?: string;
+}
+
+export interface ReturnRequestV2Body {
+  orderNumber: string;
+  returnType: "RETURN" | "EXCHANGE" | string;
+  reason: string;
+  remarks?: string;
+  items: ReturnRequestItemV2[];
+  images?: string[];
+}
+
+export async function createOnlineReturnRequestV2(
+  body: ReturnRequestV2Body
+): Promise<ApiResponse<unknown>> {
+  const { data } = await post(API_ENDPOINTS.payment.returnsV2Online, body);
+  return data;
+}
+
+export async function fetchReturnRequestV2Detail(
+  returnNumber: string
+): Promise<ApiResponse<any>> {
+  const { data } = await get(API_ENDPOINTS.payment.returnsV2Detail(returnNumber));
+  return data;
+}
+
+export async function fetchReturnRequestsV2(params?: {
+  orderNumber?: string;
+}): Promise<ApiResponse<any[]>> {
+  const { data } = await get(API_ENDPOINTS.payment.returnsV2List, { params });
   return data;
 }
 
@@ -1642,11 +1703,11 @@ export async function fetchLoyaltyHistory(): Promise<ApiResponse<{
 }>> {
   const { data } = await get(API_ENDPOINTS.customer.loyaltyHistory);
   const rawList = Array.isArray(data?.data) ? data.data : [];
-  
+
   const transactions = rawList.map((tx: any) => {
     const pointsVal = Math.abs(Number(tx.points ?? 0));
     const isRedeemed = tx.type?.toUpperCase() === "REDEEMED" || String(tx.description || "").toLowerCase().includes("redeem") || tx.points < 0;
-    
+
     return {
       _id: tx.id || tx._id,
       points: pointsVal,
@@ -1655,7 +1716,7 @@ export async function fetchLoyaltyHistory(): Promise<ApiResponse<{
       createdAt: tx.createdAt
     };
   });
-  
+
   return {
     ...data,
     data: {
@@ -1665,7 +1726,7 @@ export async function fetchLoyaltyHistory(): Promise<ApiResponse<{
   };
 }
 
-export async function redeemLoyaltyPoints(points: number): Promise<ApiResponse<{ code: string; discountValue?: number; [key: string]: any }>> {
+export async function redeemLoyaltyPoints(points: number): Promise<ApiResponse<{ code: string; discountValue?: number;[key: string]: any }>> {
   const { data } = await post(API_ENDPOINTS.customer.loyaltyRedeem, { points });
   return data;
 }

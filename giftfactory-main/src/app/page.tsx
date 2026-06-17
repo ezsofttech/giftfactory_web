@@ -19,13 +19,13 @@ import {
 import type { ApiCategory, ApiProduct } from "@/types/api";
 
 import { BannerSection, PopupBanner, BrandShowcase, ProductCarouselSection } from "@/components/sections";
-import { 
-  ServicesGrid, 
-  CategoryRibbon, 
-  FlashDeals, 
-  PromoGrid, 
-  TrendingAndWhy, 
-  HomeFaqSection 
+import {
+  ServicesGrid,
+  CategoryRibbon,
+  FlashDeals,
+  PromoGrid,
+  TrendingAndWhy,
+  HomeFaqSection
 } from "@/components/sections/custom-sections";
 
 const MIN_DEALS = 5;
@@ -101,7 +101,7 @@ export default function HomePage() {
     queryKey: ["faqs"],
     queryFn: fetchFaqs,
   });
-  
+
   const faqs = faqRes?.data && faqRes.data.length > 0 ? faqRes.data : [
     {
       question: "How do I track my order?",
@@ -123,11 +123,8 @@ export default function HomePage() {
 
   // 5. Fetch recommended products
   const { data: recRes, isLoading: recLoading } = useQuery({
-    queryKey: status === "authenticated" ? ["customer", "recommended", session?.userId] : ["web", "products", "recommended"],
-    queryFn: () =>
-      status === "authenticated"
-        ? fetchCustomerRecommended({ limit: 12, customerId: session?.userId })
-        : fetchProductRecommended({ limit: 12 }),
+    queryKey: ["web", "products", "recommended", status, session?.userId],
+    queryFn: () => fetchProductRecommended({ limit: 12 }),
   });
 
   const recData = recRes?.data;
