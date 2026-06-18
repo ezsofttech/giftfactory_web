@@ -5,6 +5,7 @@
 
 const GUEST_CART_KEY = "gf_guest_cart";
 const GUEST_CART_ID_KEY = "gf_guest_cart_id";
+const GUEST_SESSION_ID_KEY = "gf_guest_session_id";
 const GUEST_CART_UPDATED_EVENT = "guest-cart-updated";
 
 export function getGuestCartId(): string | null {
@@ -22,16 +23,32 @@ export function clearGuestCartId(): void {
   localStorage.removeItem(GUEST_CART_ID_KEY);
 }
 
+export function getGuestSessionId(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(GUEST_SESSION_ID_KEY);
+}
+
+export function saveGuestSessionId(sessionId: string): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(GUEST_SESSION_ID_KEY, sessionId);
+}
+
+export function clearGuestSessionId(): void {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(GUEST_SESSION_ID_KEY);
+}
+
 export function getOrCreateGuestSessionId(): string {
-  let id = getGuestCartId();
+  let id = getGuestSessionId() || getGuestCartId();
   if (!id) {
     id = "gs_" + Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
-    saveGuestCartId(id);
+    saveGuestSessionId(id);
   }
   return id;
 }
 
 export interface GuestCartItem {
+  id?: string;
   productId: string;
   /** May be undefined if added from a list card — resolved during sync */
   variantId?: string;
@@ -71,6 +88,7 @@ export function clearGuestCart(): void {
   if (!isBrowser()) return;
   localStorage.removeItem(GUEST_CART_KEY);
   clearGuestCartId();
+  clearGuestSessionId();
   emitGuestCartUpdated();
 }
 

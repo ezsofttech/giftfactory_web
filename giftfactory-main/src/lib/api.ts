@@ -830,31 +830,46 @@ export async function deleteCart(cartId: string): Promise<ApiResponse<ApiCart>> 
 }
 
 export async function addGuestCartItem(body: {
-  item: { productId: string; variantId?: string; quantity: number };
+  item: { productId: string; variantId?: string | null; quantity: number };
 }): Promise<ApiResponse<ApiCart>> {
-  const { data } = await post(API_ENDPOINTS.customer.guestCartAdd, body);
+  const payload = {
+    item: {
+      productId: body.item.productId,
+      ...(body.item.variantId ? { variantId: body.item.variantId } : {}),
+      quantity: body.item.quantity,
+    },
+  };
+  const { data } = await post(API_ENDPOINTS.customer.guestCartAdd, payload);
   return data;
 }
 
 export async function bulkAddGuestCartItems(body: {
-  items: { productId: string; variantId?: string; quantity: number }[];
+  items: { productId: string; variantId?: string | null; quantity: number }[];
 }): Promise<ApiResponse<ApiCart>> {
-  const { data } = await post(API_ENDPOINTS.customer.guestCartBulkAdd, body);
+  const payload = {
+    items: body.items.map((item) => ({
+      productId: item.productId,
+      ...(item.variantId ? { variantId: item.variantId } : {}),
+      quantity: item.quantity,
+    })),
+  };
+  const { data } = await post(API_ENDPOINTS.customer.guestCartBulkAdd, payload);
   return data;
 }
 
 export async function mergeGuestCart(
-  body: {
-    sessionId?: string;
-    cartId?: string;
-    items?: { productId: string; variantId?: string; quantity: number }[];
-  },
+  sessionId: string,
   token?: string
-): Promise<ApiResponse<ApiCart>> {
+): Promise<ApiResponse<any>> {
   const { data } = await post(
     API_ENDPOINTS.customer.cartMerge,
-    body,
-    token ? { headers: authHeaders(token) } : undefined
+    {},
+    {
+      headers: {
+        ...authHeaders(token),
+        "x-session-id": sessionId,
+      },
+    }
   );
   return data;
 }
@@ -875,8 +890,26 @@ export async function updateGuestCartItemAltApi(
   return data;
 }
 
+export async function removeGuestCartItem(
+  cartId: string,
+  body: { itemId: string }
+): Promise<ApiResponse<any>> {
+  const { data } = await del(API_ENDPOINTS.customer.guestCartItem(cartId), { data: body });
+  return data;
+}
+
 export async function fetchGuestCart(cartId: string): Promise<ApiResponse<ApiCart>> {
   const { data } = await get(API_ENDPOINTS.customer.guestCartById(cartId));
+  return data;
+}
+
+export async function fetchGuestCartsList(): Promise<ApiResponse<ApiCart[]>> {
+  const { data } = await get(API_ENDPOINTS.customer.guestCartList);
+  return data;
+}
+
+export async function deleteGuestCartComplete(cartId: string): Promise<ApiResponse<any>> {
+  const { data } = await del(API_ENDPOINTS.customer.guestCartById(cartId));
   return data;
 }
 
@@ -1149,7 +1182,7 @@ export async function createOrderFromCart(
 }
 
 export async function cancelOrder(orderId: string): Promise<ApiResponse<ApiOrder>> {
-  const { data } = await patch(API_ENDPOINTS.customer.orderCancel(orderId));
+  const { data } = await post(API_ENDPOINTS.customer.orderCancel(orderId));
   return data;
 }
 

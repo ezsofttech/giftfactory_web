@@ -51,9 +51,10 @@ function CheckoutPageContent() {
   useEffect(() => {
     if (status !== "authenticated" && status !== "loading" && !authOpenedRef.current) {
       authOpenedRef.current = true;
+      const queryStr = typeof window !== "undefined" ? window.location.search : "";
       openAuthModal({
         message: "Sign in to complete checkout",
-        callbackUrl: "/checkout",
+        callbackUrl: `/checkout${queryStr}`,
       });
       router.replace("/cart");
     }

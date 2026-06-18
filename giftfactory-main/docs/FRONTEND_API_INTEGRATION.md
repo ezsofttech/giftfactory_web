@@ -86,7 +86,7 @@ Paginated routes add `meta: { page, limit, total, totalPages }`.
 | GET | `/customer/orders/by-number/:orderNumber` | `fetchOrderByOrderNumber(orderNumber)` | |
 | GET | `/customer/orders/track/:orderNumber` | `trackOrder(orderNumber)` | |
 | GET | `/customer/orders/:orderId/invoice` | `fetchOrderInvoice(orderId)` | |
-| PATCH | `/customer/orders/cancel/:orderId` | `cancelOrder(orderId)` | |
+| POST | `/customer/orders/cancel/:orderId` | `cancelOrder(orderId)` | |
 | POST | `/customer/orders/reorder/:orderId` | `reorder(orderId, body?)` | Body (optional): `{ paymentMethod?, shippingAddress? }` |
 | POST | `/customer/orders/:orderId/return-request` | `returnRequestOrder(orderId, body)` | `{ requestType, reason, comment? }` |
 | GET | `/customer/orders/return-requests/list` | `fetchReturnRequests(params?)` | Query: `search`, `requestType`, `sortBy`, `fromDate`, `lastDate`, `order`, `page`, `limit` |

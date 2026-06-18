@@ -206,6 +206,14 @@ function OrderHistoryPageContent() {
     }
   }, [status, openAuthModal, router]);
 
+  // Refetch orders on mount or status change to ensure fresh data and bypass Next.js route caching
+  useEffect(() => {
+    if (status === "authenticated") {
+      queryClient.invalidateQueries({ queryKey: ["customer", "orders"] });
+      router.refresh();
+    }
+  }, [status, queryClient, router]);
+
   const { data: res, isLoading, isError } = useQuery({
     queryKey: ["customer", "orders", page, limit],
     queryFn: () =>

@@ -9,8 +9,8 @@ import { useSession } from "next-auth/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { fetchProductById, addCartItem, mergeCartIntoCache, productQueryKey, PRODUCT_STALE_TIME_MS, addGuestCartItem } from "@/lib/api";
-import { addToGuestCart, saveGuestCartId } from "@/lib/guest-cart";
-import type { ProductDisplay } from "@/types/api";
+import { addToGuestCart, saveGuestCartId, saveGuestSessionId } from "@/lib/guest-cart";
+import { getValidImageUrl, type ProductDisplay } from "@/types/api";
 
 export function ProductCard({ product }: { product: ProductDisplay }) {
   const router = useRouter();
@@ -21,10 +21,13 @@ export function ProductCard({ product }: { product: ProductDisplay }) {
 
   // Build ordered image list: thumbnail first, then remaining images (deduplicated)
   const allImages: string[] = [];
-  if (product.thumbnail) allImages.push(product.thumbnail);
+  if (product.thumbnail) allImages.push(getValidImageUrl(product.thumbnail));
   if (product.images?.length) {
     for (const img of product.images) {
-      if (img && !allImages.includes(img)) allImages.push(img);
+      if (img) {
+        const url = getValidImageUrl(img);
+        if (!allImages.includes(url)) allImages.push(url);
+      }
     }
   }
   const displayImage = allImages[imgIdx] || "https://picsum.photos/seed/gift/400/400";
@@ -37,6 +40,7 @@ export function ProductCard({ product }: { product: ProductDisplay }) {
     if (status !== "authenticated") {
       addToGuestCart({
         productId: String(product.id),
+        variantId: product.preVariantId || undefined,
         quantity: 1,
         priceAtAddition: product.price,
         title: product.title,
@@ -46,14 +50,16 @@ export function ProductCard({ product }: { product: ProductDisplay }) {
       addGuestCartItem({
         item: {
           productId: String(product.id),
+          variantId: product.preVariantId || undefined,
           quantity: 1,
         },
       }).then((res) => {
-        const cartId = (res as any)?.data?._id ?? (res as any)?._id ?? (res as any)?.data?.id ?? (res as any)?.id;
-        if (cartId) {
-          saveGuestCartId(cartId);
-          queryClient.invalidateQueries({ queryKey: ["guest", "cart"] });
-        }
+        const rawData = (res as any)?.data ?? res;
+        const cartId = rawData?._id ?? rawData?.id;
+        const sessionId = rawData?.sessionId;
+        if (cartId) saveGuestCartId(cartId);
+        if (sessionId) saveGuestSessionId(sessionId);
+        queryClient.invalidateQueries({ queryKey: ["guest", "cart"] });
       }).catch((err) => {
         console.error("Failed to sync guest cart item add to backend:", err);
       });

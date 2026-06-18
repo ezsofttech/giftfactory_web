@@ -123,7 +123,7 @@ Base URL: `{NEXT_PUBLIC_API_BASE_URL}/api/v1` (e.g. `http://192.168.1.17:3000/ap
 | GET | `/customer/orders/by-number/:orderNumber` | Order by number | `fetchOrderByOrderNumber(orderNumber)` |
 | GET | `/customer/orders/track/:orderNumber` | Track order | `trackOrder(orderNumber)` |
 | GET | `/customer/orders/:orderId/invoice` | Invoice data | `fetchOrderInvoice(orderId)` |
-| PATCH | `/customer/orders/cancel/:orderId` | Cancel order | `cancelOrder(orderId)` |
+| POST | `/customer/orders/cancel/:orderId` | Cancel order | `cancelOrder(orderId)` |
 | POST | `/customer/orders/:orderId/return-request` | Return request (reason, comment?) | `returnRequestOrder(orderId, body)` |
 | POST | `/customer/orders/reorder/:orderId` | Reorder (optional paymentMethod, shippingAddress) | `reorder(orderId, body)` |
 

@@ -22,7 +22,7 @@ import { fetchProductById, fetchRelatedProducts, fetchProductReviews, addCartIte
 import { ProductCarouselSection } from "@/components/sections";
 import { RecentlyViewedProducts } from "@/components/sections/recently-viewed";
 import { useRecentlyViewed } from "@/hooks/use-recently-viewed";
-import { addToGuestCart, saveGuestCartId } from "@/lib/guest-cart";
+import { addToGuestCart, saveGuestCartId, saveGuestSessionId } from "@/lib/guest-cart";
 import type { ApiProduct, ApiProductVariant } from "@/types/api";
 import {
   resolveSelectedVariant,
@@ -31,6 +31,7 @@ import {
   parseAverageRating,
   getProductMoqMinimum,
   getProductReviewCount,
+  getValidImageUrl,
 } from "@/types/api";
 import { useMemo, useCallback } from "react";
 import { useSession } from "next-auth/react";
@@ -409,7 +410,8 @@ export default function ProductPage({
 
   const variantImages = selectedVariant?.images?.length ? selectedVariant.images : null;
   const baseImages = product.baseImageUrl?.length ? product.baseImageUrl : null;
-  const images = variantImages ?? baseImages ?? ["PLACEHOLDER_IMAGE"];
+  const rawImages = variantImages ?? baseImages ?? [PLACEHOLDER_IMAGE];
+  const images = rawImages.map(getValidImageUrl);
 
   const productSku = product.sku;
   const variantStock =
@@ -520,11 +522,12 @@ export default function ProductPage({
           quantity: effectiveQuantity,
         },
       }).then((res) => {
-        const cartId = (res as any)?.data?._id ?? (res as any)?._id ?? (res as any)?.data?.id ?? (res as any)?.id;
-        if (cartId) {
-          saveGuestCartId(cartId);
-          queryClient.invalidateQueries({ queryKey: ["guest", "cart"] });
-        }
+        const rawData = (res as any)?.data ?? res;
+        const cartId = rawData?._id ?? rawData?.id;
+        const sessionId = rawData?.sessionId;
+        if (cartId) saveGuestCartId(cartId);
+        if (sessionId) saveGuestSessionId(sessionId);
+        queryClient.invalidateQueries({ queryKey: ["guest", "cart"] });
       }).catch((err) => {
         console.error("Failed to sync guest cart item add to backend:", err);
       });

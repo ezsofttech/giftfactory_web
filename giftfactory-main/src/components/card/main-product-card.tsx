@@ -18,7 +18,7 @@ import { useAuthModal } from "@/provider/auth-modal-provider";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { addCartItem, mergeCartIntoCache, fetchWishlist, fetchWishlistIds, toggleWishlistItem, fetchProductById, productQueryKey, PRODUCT_STALE_TIME_MS, addGuestCartItem } from "@/lib/api";
-import { addToGuestCart, saveGuestCartId } from "@/lib/guest-cart";
+import { addToGuestCart, saveGuestCartId, saveGuestSessionId } from "@/lib/guest-cart";
 import type { ApiWishlistItem, ApiProduct } from "@/types/api";
 
 interface Product {
@@ -178,6 +178,7 @@ export function ProductCard({ product, className, showDescription = false }: Pro
     if (status !== "authenticated") {
       addToGuestCart({
         productId: String(product.id),
+        variantId: product.preVariantId || undefined,
         quantity: 1,
         priceAtAddition: product.price,
         title: product.title,
@@ -187,14 +188,16 @@ export function ProductCard({ product, className, showDescription = false }: Pro
       addGuestCartItem({
         item: {
           productId: String(product.id),
+          variantId: product.preVariantId || undefined,
           quantity: 1,
         },
       }).then((res) => {
-        const cartId = (res as any)?.data?._id ?? (res as any)?._id ?? (res as any)?.data?.id ?? (res as any)?.id;
-        if (cartId) {
-          saveGuestCartId(cartId);
-          queryClient.invalidateQueries({ queryKey: ["guest", "cart"] });
-        }
+        const rawData = (res as any)?.data ?? res;
+        const cartId = rawData?._id ?? rawData?.id;
+        const sessionId = rawData?.sessionId;
+        if (cartId) saveGuestCartId(cartId);
+        if (sessionId) saveGuestSessionId(sessionId);
+        queryClient.invalidateQueries({ queryKey: ["guest", "cart"] });
       }).catch((err) => {
         console.error("Failed to sync guest cart item add to backend:", err);
       });
@@ -333,21 +336,22 @@ export function ProductCard({ product, className, showDescription = false }: Pro
     }
   };
 
-  const handleBuyNow = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const handleBuyNow = async (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     if (status !== "authenticated") {
-      const slugOrId = String(product.id);
       openAuthModal({
         message: "Sign in to buy now",
-        callbackUrl: `/products/${slugOrId}`,
+        onSuccess: () => handleBuyNow(),
       });
       return;
     }
 
     setBuyingNow(true);
     try {
-      // First, add the product to the cart
+      // First, get the product variant details if not pre-selected
       let variantId: string | undefined = product.preVariantId;
       if (!variantId) {
         try {
@@ -376,22 +380,9 @@ export function ProductCard({ product, className, showDescription = false }: Pro
         }
       }
 
-      // Add product to cart
-      let res;
-      if (variantId) {
-        res = await addCartItem({
-          item: { productId: String(product.id), variantId, quantity: 1 },
-        });
-      } else {
-        res = await addCartItem({
-          item: { productId: String(product.id), quantity: 1 },
-        });
-      }
-      mergeCartIntoCache(queryClient, res);
-      queryClient.invalidateQueries({ queryKey: ["customer", "cart"] });
-
-      // Then redirect to checkout
-      router.push(`/checkout`);
+      // Direct checkout for Buy Now (leaving other cart items untouched)
+      const variantParam = variantId ? `&variantId=${variantId}` : "";
+      router.push(`/checkout?productId=${product.id}${variantParam}&quantity=1&price=${product.price}`);
       setShowQuickView(false);
     } catch (err: any) {
       const msg = err?.response?.data?.message ?? err?.message ?? "Failed to buy now";

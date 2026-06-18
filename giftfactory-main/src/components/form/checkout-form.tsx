@@ -433,7 +433,39 @@ export function CheckoutForm({ carts, cartId, productMap, appliedCoupon, onCoupo
     try {
       const res = await redeemLoyaltyPoints(points);
       const rawRes = res as any;
-      const couponCode = rawRes?.data?.code ?? rawRes?.code ?? (typeof rawRes?.data === "string" ? rawRes.data : undefined);
+      console.log("[handleRedeemLoyalty] redeem response:", rawRes);
+
+      let couponCode: string | undefined = undefined;
+
+      if (rawRes) {
+        if (typeof rawRes.data?.code === "string" && rawRes.data.code.trim()) {
+          couponCode = rawRes.data.code.trim();
+        } else if (typeof rawRes.code === "string" && rawRes.code.trim()) {
+          couponCode = rawRes.code.trim();
+        } else if (typeof rawRes.data?.coupon?.code === "string" && rawRes.data.coupon.code.trim()) {
+          couponCode = rawRes.data.coupon.code.trim();
+        } else if (typeof rawRes.coupon?.code === "string" && rawRes.coupon.code.trim()) {
+          couponCode = rawRes.coupon.code.trim();
+        } else if (typeof rawRes.data?.coupon === "string" && rawRes.data.coupon.trim()) {
+          couponCode = rawRes.data.coupon.trim();
+        } else if (typeof rawRes.coupon === "string" && rawRes.coupon.trim()) {
+          couponCode = rawRes.coupon.trim();
+        } else if (typeof rawRes.data?.couponCode === "string" && rawRes.data.couponCode.trim()) {
+          couponCode = rawRes.data.couponCode.trim();
+        } else if (typeof rawRes.couponCode === "string" && rawRes.couponCode.trim()) {
+          couponCode = rawRes.couponCode.trim();
+        } else if (typeof rawRes.data?.discountCode === "string" && rawRes.data.discountCode.trim()) {
+          couponCode = rawRes.data.discountCode.trim();
+        } else if (typeof rawRes.discountCode === "string" && rawRes.discountCode.trim()) {
+          couponCode = rawRes.discountCode.trim();
+        } else if (typeof rawRes.data?.discount?.code === "string" && rawRes.data.discount.code.trim()) {
+          couponCode = rawRes.data.discount.code.trim();
+        } else if (typeof rawRes.discount?.code === "string" && rawRes.discount.code.trim()) {
+          couponCode = rawRes.discount.code.trim();
+        } else if (typeof rawRes.data === "string" && rawRes.data.trim()) {
+          couponCode = rawRes.data.trim();
+        }
+      }
 
       if (!couponCode) {
         throw new Error("API did not return a valid coupon code.");

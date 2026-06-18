@@ -6,8 +6,8 @@ import Link from "next/link";
 import { useMemo, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { fetchCart, fetchProductById, updateCartItem, removeCartItem, productQueryKey, PRODUCT_STALE_TIME_MS, updateGuestCartItemApi, updateGuestCartItemAltApi, fetchGuestCart, fetchProductRecommended } from "@/lib/api";
-import { getGuestCart, updateGuestCartItem, removeFromGuestCart, type GuestCartItem, getGuestCartId, saveGuestCart } from "@/lib/guest-cart";
+import { fetchCart, fetchProductById, updateCartItem, removeCartItem, productQueryKey, PRODUCT_STALE_TIME_MS, updateGuestCartItemApi, updateGuestCartItemAltApi, removeGuestCartItem, fetchGuestCart, fetchProductRecommended, fetchGuestCartsList, deleteGuestCartComplete } from "@/lib/api";
+import { getGuestCart, updateGuestCartItem, removeFromGuestCart, type GuestCartItem, getGuestCartId, saveGuestCart, saveGuestCartId } from "@/lib/guest-cart";
 import type { ApiCart, ApiCartItem, ApiProduct, ApiProductVariant, ApiResponse } from "@/types/api";
 import { mapApiProductToDisplay } from "@/types/api";
 import { toast } from "sonner";
@@ -87,15 +87,128 @@ export default function CartPage() {
     setGuestItems(getGuestCart());
   }, []);
 
-  const guestTotal = guestItems.reduce((s, i) => s + i.priceAtAddition * i.quantity, 0);
+  const guestCartId = getGuestCartId();
+
+  const { data: res, isLoading, isError } = useQuery({
+    queryKey: status === "authenticated" ? ["customer", "cart"] : ["guest", "cart", guestCartId],
+    queryFn: async (): Promise<ApiResponse<ApiCart[]>> => {
+      if (status === "authenticated") {
+        return fetchCart();
+      }
+      
+      let resolvedCartId = guestCartId;
+      if (!resolvedCartId) {
+        try {
+          const listRes = await fetchGuestCartsList();
+          const activeCarts = listRes?.data ?? listRes;
+          if (Array.isArray(activeCarts) && activeCarts.length > 0) {
+            const activeCart = activeCarts.find(
+              (c: any) => !c.status || c.status.toLowerCase() === "active"
+            );
+            if (activeCart) {
+              resolvedCartId = activeCart._id;
+              if (resolvedCartId) {
+                saveGuestCartId(resolvedCartId);
+              }
+            }
+          }
+        } catch (err) {
+          console.error("Failed to fetch guest carts list:", err);
+        }
+      }
+
+      if (!resolvedCartId) {
+        return { data: [] };
+      }
+
+      const response = await fetchGuestCart(resolvedCartId);
+      const cartData = response?.data ?? response;
+      return {
+        ...response,
+        data: cartData ? [cartData as ApiCart] : [],
+      };
+    },
+    enabled: status === "authenticated" || status === "unauthenticated",
+    staleTime: 0,
+    refetchOnMount: true,
+  });
+
+  // Only show active carts with items — filter out abandoned/empty ones
+  const carts = useMemo(() => {
+    return ((res?.data ?? []) as ApiCart[]).filter(
+      (c) =>
+        (!c.status || c.status.toLowerCase() === "active") &&
+        ((c.itemsCount ?? 0) > 0 || (c.items && c.items.length > 0))
+    );
+  }, [res]);
+
+  const productIds = useMemo(() => {
+    const set = new Set<string>();
+    if (status === "authenticated") {
+      carts.forEach((cart) =>
+        cart.items?.forEach((item) => {
+          const id =
+            typeof item.productId === "object" && item.productId && "_id" in item.productId
+              ? (item.productId as { _id: string })._id
+              : typeof item.productId === "string"
+                ? item.productId
+                : "";
+          if (id) set.add(id);
+        })
+      );
+    } else {
+      guestItems.forEach((item) => {
+        if (item.productId) set.add(item.productId);
+      });
+    }
+    return Array.from(set);
+  }, [carts, guestItems, status]);
+
+  const productQueries = useQueries({
+    queries: productIds.map((id) => ({
+      queryKey: productQueryKey(id),
+      queryFn: () => fetchProductById(id),
+      enabled: !!id,
+      staleTime: PRODUCT_STALE_TIME_MS,
+    })),
+  });
+  const productMap = useMemo(() => {
+    const map = new Map<string, ApiProduct>();
+    productQueries.forEach((q, i) => {
+      const raw = q.data;
+      const product = (raw as { data?: ApiProduct })?.data ?? (raw as ApiProduct);
+      if (product?._id && productIds[i]) map.set(productIds[i], product);
+    });
+    return map;
+  }, [productQueries, productIds]);
+
+  const guestTotal = useMemo(() => {
+    return guestItems.reduce((sum, item) => {
+      const fetchedProduct = item.productId ? productMap.get(item.productId) : undefined;
+      const variantObj = fetchedProduct?.variantIds?.find((v) => v._id === item.variantId);
+      
+      const basePrice = fetchedProduct
+        ? (fetchedProduct.price?.sellingPrice ?? fetchedProduct.defaultPrice ?? 0)
+        : item.priceAtAddition;
+        
+      const price = variantObj?.price?.sellingPrice ?? basePrice;
+      return sum + price * item.quantity;
+    }, 0);
+  }, [guestItems, productMap]);
 
   const updateGuest = (productId: string, variantId: string | undefined, quantity: number) => {
     updateGuestCartItem(productId, variantId, quantity);
-    setGuestItems(getGuestCart());
+    const updatedItems = getGuestCart();
+    setGuestItems(updatedItems);
 
     const cartId = getGuestCartId();
     if (cartId) {
-      const payload = { itemId: productId, quantity };
+      const item = updatedItems.find(
+        (i) => i.productId === productId && (!variantId || i.variantId === variantId)
+      );
+      const dbItemId = item?.id || productId;
+
+      const payload = { itemId: dbItemId, quantity };
       updateGuestCartItemApi(cartId, payload).catch((err) => {
         console.error("Failed to sync guest cart item via standard endpoint:", err);
       });
@@ -105,30 +218,33 @@ export default function CartPage() {
     }
   };
   const removeGuest = (productId: string, variantId: string | undefined) => {
+    const targetItem = guestItems.find(
+      (i) => i.productId === productId && (!variantId || i.variantId === variantId)
+    );
+    const dbItemId = targetItem?.id || productId;
+
     removeFromGuestCart(productId, variantId);
-    setGuestItems(getGuestCart());
+    const updatedItems = getGuestCart();
+    setGuestItems(updatedItems);
+
+    const cartId = getGuestCartId();
+    if (cartId) {
+      if (updatedItems.length === 0) {
+        deleteGuestCartComplete(cartId)
+          .then(() => {
+            queryClient.invalidateQueries({ queryKey: ["guest", "cart"] });
+          })
+          .catch((err) => {
+            console.error("Failed to delete guest cart from backend:", err);
+          });
+      } else {
+        removeGuestCartItem(cartId, { itemId: dbItemId }).catch((err) => {
+          console.error("Failed to remove guest cart item from backend:", err);
+        });
+      }
+    }
     toast.success("Item removed");
   };
-  // ─────────────────────────────────────────────────────────────────────────
-  const guestCartId = getGuestCartId();
-
-  const { data: res, isLoading, isError } = useQuery({
-    queryKey: status === "authenticated" ? ["customer", "cart"] : ["guest", "cart", guestCartId],
-    queryFn: async (): Promise<ApiResponse<ApiCart[]>> => {
-      if (status === "authenticated") {
-        return fetchCart();
-      }
-      const response = await fetchGuestCart(guestCartId!);
-      const cartData = response?.data ?? response;
-      return {
-        ...response,
-        data: cartData ? [cartData as ApiCart] : [],
-      };
-    },
-    enabled: status === "authenticated" || (status === "unauthenticated" && !!guestCartId),
-    staleTime: 0,
-    refetchOnMount: true,
-  });
 
   // Recommended products for empty state
   const { data: recRes, isLoading: recLoading } = useQuery({
@@ -142,16 +258,29 @@ export default function CartPage() {
     if (status !== "authenticated" && res?.data) {
       const cartData = Array.isArray(res.data) ? res.data[0] : res.data;
       if (cartData?.items) {
+        const localItems = getGuestCart();
         const mappedItems: GuestCartItem[] = cartData.items.map((item: any) => {
           const p = item.productId;
           const productId = typeof p === "object" ? p?._id ?? p?.id : p;
-          const title = typeof p === "object" ? p?.title : undefined;
-          const thumbnail = typeof p === "object" ? p?.thumbnail : undefined;
+          
+          const resolvedVariantId = typeof item.variantId === "object" && item.variantId
+            ? item.variantId?._id
+            : item.variantId;
+
+          const localItem = localItems.find(
+            (li) => li.productId === productId && (li.variantId === resolvedVariantId)
+          );
+
+          const title = typeof p === "object" ? p?.title : (localItem?.title ?? undefined);
+          const thumbnail = typeof p === "object" ? p?.thumbnail : (localItem?.thumbnail ?? undefined);
+          const priceAtAddition = item.priceAtAddition || (localItem?.priceAtAddition ?? 0);
+
           return {
+            id: item._id ?? item.id,
             productId,
-            variantId: typeof item.variantId === "object" ? item.variantId?._id : item.variantId,
+            variantId: resolvedVariantId,
             quantity: item.quantity,
-            priceAtAddition: item.priceAtAddition ?? 0,
+            priceAtAddition,
             title,
             thumbnail,
           };
@@ -161,46 +290,6 @@ export default function CartPage() {
       }
     }
   }, [res, status]);
-
-  // Only show active carts with items — filter out abandoned/empty ones
-  const carts = ((res?.data ?? []) as ApiCart[]).filter(
-    (c) =>
-      (!c.status || c.status.toLowerCase() === "active") &&
-      ((c.itemsCount ?? 0) > 0 || (c.items && c.items.length > 0))
-  );
-  const productIds = useMemo(() => {
-    const set = new Set<string>();
-    carts.forEach((cart) =>
-      cart.items?.forEach((item) => {
-        const id =
-          typeof item.productId === "object" && item.productId && "_id" in item.productId
-            ? (item.productId as { _id: string })._id
-            : typeof item.productId === "string"
-              ? item.productId
-              : "";
-        if (id) set.add(id);
-      })
-    );
-    return Array.from(set);
-  }, [carts]);
-
-  const productQueries = useQueries({
-    queries: productIds.map((id) => ({
-      queryKey: productQueryKey(id),
-      queryFn: () => fetchProductById(id),
-      enabled: !!id && status === "authenticated",
-      staleTime: PRODUCT_STALE_TIME_MS,
-    })),
-  });
-  const productMap = useMemo(() => {
-    const map = new Map<string, ApiProduct>();
-    productQueries.forEach((q, i) => {
-      const raw = q.data;
-      const product = (raw as { data?: ApiProduct })?.data ?? (raw as ApiProduct);
-      if (product?._id && productIds[i]) map.set(productIds[i], product);
-    });
-    return map;
-  }, [productQueries, productIds]);
 
   const updateMutation = useMutation({
     mutationFn: ({
@@ -559,9 +648,41 @@ export default function CartPage() {
               /* Guest Items */
               <div className="bg-white/90 backdrop-blur-sm border border-gray-100 rounded-3xl p-6 shadow-xl shadow-gray-200/40 divide-y divide-gray-100/60">
                 {guestItems.map((item, idx) => {
-                  const mrp = item.priceAtAddition * 1.5;
-                  const discountPercent = 33;
-                  const subDesc = "Premium Custom Design, Best Quality Handcrafted Gift";
+                  const fetchedProduct = item.productId ? productMap.get(item.productId) : undefined;
+                  
+                  const productInfo = fetchedProduct
+                    ? (() => {
+                      const p = fetchedProduct as ApiProduct & Record<string, unknown>;
+                      const d = mapApiProductToDisplay(fetchedProduct);
+                      const thumb = getProductImageUrl(p) || d.thumbnail || "";
+                      return {
+                        id: d.id,
+                        title: d.title,
+                        thumbnail: thumb.trim() || "https://picsum.photos/seed/gift/400/400",
+                      };
+                    })()
+                    : {
+                      id: item.productId,
+                      title: item.title ?? "Product",
+                      thumbnail: item.thumbnail ?? "https://picsum.photos/seed/gift/400/400",
+                    };
+
+                  const variantObj = fetchedProduct?.variantIds?.find(
+                    (v) => v._id === item.variantId
+                  );
+                  
+                  const basePrice = fetchedProduct
+                    ? (fetchedProduct.price?.sellingPrice ?? fetchedProduct.defaultPrice ?? 0)
+                    : item.priceAtAddition;
+                    
+                  const baseMrp = fetchedProduct
+                    ? (fetchedProduct.price?.mrp ?? fetchedProduct.mrp ?? basePrice * 1.5)
+                    : item.priceAtAddition * 1.5;
+
+                  const price = variantObj?.price?.sellingPrice ?? basePrice;
+                  const mrp = variantObj?.price?.mrp ?? baseMrp;
+                  const discountPercent = mrp > price ? Math.round(((mrp - price) / mrp) * 100) : 33;
+                  const subDesc = variantObj?.title ?? fetchedProduct?.sub_title ?? "Premium Custom Design, Best Quality Handcrafted Gift";
 
                   return (
                     <div
@@ -574,11 +695,7 @@ export default function CartPage() {
                           href={`/products/${item.productId}`}
                           className="relative h-20 w-20 sm:h-24 sm:w-24 overflow-hidden rounded-xl border border-gray-200 bg-white block shadow-sm"
                         >
-                          {item.thumbnail ? (
-                            <CartItemImage src={item.thumbnail} alt={item.title ?? "Product"} />
-                          ) : (
-                            <ShoppingBag className="h-10 w-10 text-gray-300 m-auto mt-7" />
-                          )}
+                          <CartItemImage src={productInfo.thumbnail} alt={productInfo.title} />
                         </Link>
 
                         {/* Qty Dropdown */}
@@ -604,7 +721,7 @@ export default function CartPage() {
                       <div className="flex-1 min-w-0 space-y-1.5 pr-12">
                         <p className="font-semibold text-gray-950 text-sm sm:text-base leading-snug line-clamp-2">
                           <Link href={`/products/${item.productId}`} className="hover:text-pink-500 transition-colors">
-                            {item.title ?? "Product"}
+                            {productInfo.title}
                           </Link>
                         </p>
 
@@ -614,21 +731,29 @@ export default function CartPage() {
 
                         {/* Stars */}
                         <div className="flex items-center gap-1.5">
-                          {renderStars(4.2)}
-                          <span className="text-xs font-extrabold text-green-600">4.2</span>
-                          <span className="text-xs text-gray-400 font-bold">&middot; (128)</span>
+                          {renderStars(Number(fetchedProduct?.averageRating || 4.2))}
+                          <span className="text-xs font-extrabold text-green-600">
+                            {Number(fetchedProduct?.averageRating || 4.2).toFixed(1)}
+                          </span>
+                          <span className="text-xs text-gray-400 font-bold">
+                            &middot; ({(fetchedProduct?.commentCount || 128).toLocaleString()})
+                          </span>
                         </div>
 
                         {/* Pricing */}
                         <div className="flex items-center gap-2 pt-1">
-                          <span className="text-green-600 font-extrabold text-sm flex items-center gap-0.5 select-none">
-                            &darr;{discountPercent}%
-                          </span>
-                          <span className="text-gray-400 line-through text-sm font-semibold">
-                            ₹{Math.round(mrp).toLocaleString()}
-                          </span>
+                          {discountPercent > 0 && (
+                            <span className="text-green-600 font-extrabold text-sm flex items-center gap-0.5 select-none">
+                              &darr;{discountPercent}%
+                            </span>
+                          )}
+                          {mrp > price && (
+                            <span className="text-gray-400 line-through text-sm font-semibold">
+                              ₹{Math.round(mrp).toLocaleString()}
+                            </span>
+                          )}
                           <span className="text-gray-900 font-black text-base">
-                            ₹{item.priceAtAddition.toLocaleString()}
+                            ₹{price.toLocaleString()}
                           </span>
                         </div>
 
@@ -638,7 +763,7 @@ export default function CartPage() {
                             WOW!
                           </span>
                           <span className="text-blue-700 font-black text-xs">
-                            Buy at ₹{Math.round(item.priceAtAddition * 0.95).toLocaleString()}
+                            Buy at ₹{Math.round(price * 0.95).toLocaleString()}
                           </span>
                         </div>
 
