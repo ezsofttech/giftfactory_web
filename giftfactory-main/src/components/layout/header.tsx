@@ -38,7 +38,15 @@ const QUICK_LINKS = [
   { label: "Today's Deals", href: "/products?deals=1" },
 ];
 
-const LoyaltyCoinIcon = ({ tier, size = 18 }: { tier?: "BRONZE" | "SILVER" | "GOLD" | "PLATINUM" | string; size?: number }) => {
+const LoyaltyCoinIcon = ({
+  tier,
+  size,
+  className,
+}: {
+  tier?: "BRONZE" | "SILVER" | "GOLD" | "PLATINUM" | string;
+  size?: number;
+  className?: string;
+}) => {
   let gradientColors = ["#CD7F32", "#A57128"]; // Bronze default
   if (tier === "SILVER") {
     gradientColors = ["#CBD5E1", "#64748B"];
@@ -49,7 +57,12 @@ const LoyaltyCoinIcon = ({ tier, size = 18 }: { tier?: "BRONZE" | "SILVER" | "GO
   }
   
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className="shrink-0">
+    <svg
+      {...(size && !className ? { width: size, height: size } : {})}
+      viewBox="0 0 24 24"
+      fill="none"
+      className={className ?? "shrink-0"}
+    >
       <defs>
         <linearGradient id={`coinGrad-${tier}`} x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor={gradientColors[0]} />
@@ -228,13 +241,16 @@ export const Header = () => {
             {status === "authenticated" && loyalty && (
               <Link
                 href="/loyalty"
-                className="hidden md:flex items-center gap-1.5 text-gray-700 hover:text-primary transition-colors cursor-pointer"
+                className="flex items-center gap-1 md:gap-1.5 text-gray-700 hover:text-primary transition-colors cursor-pointer"
                 aria-label="Loyalty Rewards"
               >
-                <LoyaltyCoinIcon tier={loyalty.tier} size={22} />
-                <span className="text-sm font-bold text-gray-900 flex items-center gap-1">
+                <LoyaltyCoinIcon
+                  tier={loyalty.tier}
+                  className="shrink-0 h-[18px] w-[18px] md:h-[22px] md:w-[22px]"
+                />
+                <span className="text-xs md:text-sm font-bold text-gray-900 flex items-center gap-0.5 md:gap-1">
                   {loyalty.points}
-                  <span className="text-sm font-normal text-gray-500">Points</span>
+                  <span className="hidden md:inline text-sm font-normal text-gray-500">Points</span>
                 </span>
               </Link>
             )}
