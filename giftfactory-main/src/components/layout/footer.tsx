@@ -48,7 +48,7 @@ export function Footer() {
           {/* Column 1: Brand Logo, Description & Socials */}
           <div className="flex flex-col items-start lg:col-span-1">
             <Link href="/" className="flex items-center gap-3">
-              <img src="/favicon.png" alt="Logo" className="h-8 w-8 object-contain shrink-0" />
+              <img src="/GiftFactoryLogo.png" alt="Logo" className="h-8 w-8 object-contain shrink-0" />
               <span className="font-bold text-white text-lg tracking-wider uppercase">GIFT FACTORY</span>
             </Link>
             <p className="text-[13px] text-slate-400 mt-4 max-w-[240px] leading-relaxed">
