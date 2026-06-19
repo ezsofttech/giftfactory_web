@@ -17,7 +17,7 @@ export const API_ENDPOINTS = {
     forgotPassword: (email: string) => `${BASE}/customer/${encodeURIComponent(email)}/forgot-password`,
     resetPassword: (email: string) => `${BASE}/customer/reset-password/${encodeURIComponent(email)}`,
     logout: `${BASE}/customer/logout`,
-    me: `${BASE}/customer/me`,//not done
+    me: `${BASE}/customer/me`,
     profileUpdate: `${BASE}/customer/profile-update`,
     changePassword: `${BASE}/customer/change-password`,
   },
@@ -29,9 +29,9 @@ export const API_ENDPOINTS = {
     // Backend currently exposes phone OTP send on vendor-auth route and verify on customer-auth.
     sendPhoneOtp: (phone: string) => `${BASE}/vendor-auth/${encodeURIComponent(phone)}/otp`,//not done
     verifyPhoneOtp: `${BASE}/customer-auth/phone/otp-verification`,//not done
-    forgotPassword: (email: string) => `${BASE}/customer-auth/${encodeURIComponent(email)}/forgot-password`,//not done
-    resetPassword: `${BASE}/customer-auth/reset-password`,//not done
-    me: `${BASE}/customer/me`,//not done
+    forgotPassword: (email: string) => `${BASE}/customer-auth/${encodeURIComponent(email)}/forgot-password`,
+    resetPassword: `${BASE}/customer-auth/reset-password`,
+    me: `${BASE}/customer/me`,
     profileUpdate: `${BASE}/customer/profile-update`,
   },
   // Controller is @Controller('api/v1/search') with global prefix api/v1 → /api/v1/search/...
@@ -151,6 +151,7 @@ export const API_ENDPOINTS = {
     unsubscribe: `${BASE}/newsletter/unsubscribe`,
   },
   invoices: {
+    create: `${BASE}/invoices`,
     download: (invoiceNumber: string) => `${BASE}/invoices/${encodeURIComponent(invoiceNumber)}/download?view=CUSTOMER`,
     view: (invoiceNumber: string) => `${BASE}/invoices/${encodeURIComponent(invoiceNumber)}/view`,
   },

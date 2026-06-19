@@ -861,6 +861,12 @@ export default function OrderDetailPage({
     order.paymentStatus?.toUpperCase() !== "PAID" &&
     order.paymentStatus?.toUpperCase() !== "COMPLETED";
 
+  const canDownloadInvoice =
+    order &&
+    order.paymentMethod?.toUpperCase() !== "COD" &&
+    (order.paymentStatus?.toUpperCase() === "PAID" ||
+      order.paymentStatus?.toUpperCase() === "COMPLETED");
+
   return (
     <div className="container mx-auto px-4 py-6 max-w-6xl">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
@@ -881,15 +887,17 @@ export default function OrderDetailPage({
               Cancel Order
             </Button>
           )}
-          <Button
-            variant="default"
-            className="gap-2"
-            onClick={handleDownloadInvoice}
-            disabled={downloadingInvoice}
-          >
-            <Download className="h-4 w-4" />
-            {downloadingInvoice ? "Preparing…" : "Download Invoice"}
-          </Button>
+          {canDownloadInvoice && (
+            <Button
+              variant="default"
+              className="gap-2"
+              onClick={handleDownloadInvoice}
+              disabled={downloadingInvoice}
+            >
+              <Download className="h-4 w-4" />
+              {downloadingInvoice ? "Preparing…" : "Download Invoice"}
+            </Button>
+          )}
         </div>
       </div>
 

@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { MapPin, Plus, Save, Mail, Truck, CreditCard, Smartphone, Wallet, Globe, Banknote, Phone, Coins, Sparkles } from "lucide-react";
-import { createOrder, createOrderFromCart, fetchAddresses, addAddress, fetchProductById, deleteCart, fetchProfile, sendPhoneOtp, verifyPhoneOtp, updateProfile, validateCoupon, fetchOrders, fetchCheckoutPreview, fetchWebCoupons, fetchLoyaltyBalance, redeemLoyaltyPoints } from "@/lib/api";
+import { createOrder, createOrderFromCart, fetchAddresses, addAddress, fetchProductById, deleteCart, fetchProfile, sendPhoneOtp, verifyPhoneOtp, updateProfile, validateCoupon, fetchOrders, fetchCheckoutPreview, fetchWebCoupons, fetchLoyaltyBalance, redeemLoyaltyPoints, createInvoice } from "@/lib/api";
 import type { PaymentMethod, ApiCoupon, CreateOrderBody, CreateOrderFromCartBody } from "@/lib/api";
 import { openRazorpayCheckout } from "@/lib/payments";
 import type { ApiAddress, ApiCart, ApiCartItem, ApiProduct } from "@/types/api";
@@ -113,6 +113,8 @@ interface PendingPaymentContext {
   prefillName?: string;
   prefillEmail: string;
   productOrderNumber: string;
+  matchedOrder?: any;
+  targetRequestId?: string;
 }
 
 const NEW_ADDRESS_VALUE = "new";
@@ -379,6 +381,36 @@ export function CheckoutForm({ carts, cartId, productMap, appliedCoupon, onCoupo
       });
 
       // Payment successful
+      try {
+        const orderDate = payment.matchedOrder?.createdAt
+          ? new Date(payment.matchedOrder.createdAt)
+          : new Date();
+        const formattedDate = [
+          String(orderDate.getDate()).padStart(2, "0"),
+          String(orderDate.getMonth() + 1).padStart(2, "0"),
+          orderDate.getFullYear(),
+        ].join("-");
+
+        const gstVal = payment.matchedOrder?.gstRate != null
+          ? (payment.matchedOrder.gstRate < 1 ? Math.round(payment.matchedOrder.gstRate * 100) : payment.matchedOrder.gstRate)
+          : 18;
+
+        const invoicePayload = {
+          orderNumber: payment.productOrderNumber,
+          stockRequestId: payment.matchedOrder?.stockRequestId || payment.matchedOrder?.orderRequestId || payment.matchedOrder?.requestId || payment.matchedOrder?.request_id || payment.targetRequestId || ("stockreq_" + payment.productOrderNumber),
+          order_date: formattedDate,
+          shippingFee: payment.matchedOrder?.shippingFee ?? 500,
+          gstRate: gstVal,
+        };
+
+        console.log("[runOnlinePayment] generating invoice in background:", invoicePayload);
+        createInvoice(invoicePayload).catch((invErr) => {
+          console.error("Failed to generate invoice in background:", invErr);
+        });
+      } catch (invErr) {
+        console.error("Failed to process invoice generation logic:", invErr);
+      }
+
       await clearServerCartsAfterCheckout();
       queryClient.invalidateQueries({ queryKey: ["customer", "cart"] });
       queryClient.invalidateQueries({ queryKey: ["customer", "orders"] });
@@ -656,10 +688,10 @@ export function CheckoutForm({ carts, cartId, productMap, appliedCoupon, onCoupo
       const targetRequestId = findKeyInObj(orderRes, ["requestId", "request_id"]);
       console.log("[checkout-form] targetRequestId for polling:", targetRequestId);
 
+      let matchedOrder: any = null;
       try {
         const maxAttempts = 10;
         const pollIntervalMs = 2000;
-        let matchedOrder: any = null;
 
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
           console.log(`[checkout-form] polling order status (attempt ${attempt}/${maxAttempts})...`);
@@ -722,6 +754,8 @@ export function CheckoutForm({ carts, cartId, productMap, appliedCoupon, onCoupo
         prefillName: `${values.firstName || ""} ${values.lastName || ""}`.trim() || undefined,
         prefillEmail: values.email,
         productOrderNumber,
+        matchedOrder,
+        targetRequestId,
       };
 
       await runOnlinePayment(paymentContext, effectiveContact);

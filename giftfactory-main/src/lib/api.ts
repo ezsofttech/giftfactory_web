@@ -1307,6 +1307,17 @@ export async function fetchAddresses(): Promise<ApiResponse<ApiAddress[]>> {
   const { data } = await get(API_ENDPOINTS.customer.addressesList);
   if (data && Array.isArray(data.data)) {
     data.data = data.data.map(normalizeAddress);
+    if (data.data.length === 1 && !data.data[0].is_default) {
+      const addressId = data.data[0]._id;
+      if (addressId) {
+        data.data[0].is_default = true;
+        data.data[0].isDefault = true;
+        // Automatically set it as default in the backend
+        setDefaultAddress(addressId).catch((err) => {
+          console.error("Failed to automatically set single address as default:", err);
+        });
+      }
+    }
   }
   return data;
 }
@@ -1701,6 +1712,19 @@ export async function downloadInvoice(invoiceNumber: string): Promise<any> {
 
 export async function viewInvoice(invoiceNumber: string): Promise<ApiResponse<any>> {
   const { data } = await get(API_ENDPOINTS.invoices.view(invoiceNumber));
+  return data;
+}
+
+export interface CreateInvoiceBody {
+  orderNumber: string;
+  stockRequestId: string;
+  order_date: string;
+  shippingFee: number;
+  gstRate: number;
+}
+
+export async function createInvoice(body: CreateInvoiceBody): Promise<ApiResponse<unknown>> {
+  const { data } = await post(API_ENDPOINTS.invoices.create, body);
   return data;
 }
 

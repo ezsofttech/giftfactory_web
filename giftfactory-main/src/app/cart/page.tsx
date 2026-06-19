@@ -135,12 +135,32 @@ export default function CartPage() {
 
   // Only show active carts with items — filter out abandoned/empty ones
   const carts = useMemo(() => {
-    return ((res?.data ?? []) as ApiCart[]).filter(
+    const activeCarts = ((res?.data ?? []) as ApiCart[]).filter(
       (c) =>
         (!c.status || c.status.toLowerCase() === "active") &&
         ((c.itemsCount ?? 0) > 0 || (c.items && c.items.length > 0))
     );
+
+    // Sort items inside each active cart to keep order stable on updates
+    return activeCarts.map((c) => {
+      if (!c.items) return c;
+      const sortedItems = [...c.items].sort((a, b) => {
+        const keyA = a._id || a.id || (typeof a.productId === "object" ? (a.productId as any)?._id : a.productId) || "";
+        const keyB = b._id || b.id || (typeof b.productId === "object" ? (b.productId as any)?._id : b.productId) || "";
+        return keyA.localeCompare(keyB);
+      });
+      return { ...c, items: sortedItems };
+    });
   }, [res]);
+
+  // Sort guest items by a stable key to prevent reordering on quantity change
+  const sortedGuestItems = useMemo(() => {
+    return [...guestItems].sort((a, b) => {
+      const keyA = a.id || a.productId || "";
+      const keyB = b.id || b.productId || "";
+      return keyA.localeCompare(keyB);
+    });
+  }, [guestItems]);
 
   const productIds = useMemo(() => {
     const set = new Set<string>();
@@ -647,7 +667,7 @@ export default function CartPage() {
             ) : (
               /* Guest Items */
               <div className="bg-white/90 backdrop-blur-sm border border-gray-100 rounded-3xl p-6 shadow-xl shadow-gray-200/40 divide-y divide-gray-100/60">
-                {guestItems.map((item, idx) => {
+                {sortedGuestItems.map((item, idx) => {
                   const fetchedProduct = item.productId ? productMap.get(item.productId) : undefined;
                   
                   const productInfo = fetchedProduct
