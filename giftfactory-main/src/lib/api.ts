@@ -985,6 +985,11 @@ export async function verifyPayment(body: {
   return data;
 }
 
+export async function cancelPaymentOrder(razorpayOrderId: string): Promise<ApiResponse<unknown>> {
+  const { data } = await post(API_ENDPOINTS.payment.cancelPaymentOrder(razorpayOrderId), {});
+  return data;
+}
+
 /**
  * @deprecated Use toggleWishlistItem instead.
  */

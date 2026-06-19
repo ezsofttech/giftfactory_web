@@ -13,6 +13,7 @@ import Image from "next/image";
 import { useAuthModal } from "@/provider/auth-modal-provider";
 import { ArrowLeft, CreditCard, Clock, Package, Star, Store, User, MessageSquare } from "lucide-react";
 import { fetchOrders, fetchProductById, fetchProductReviews, submitReview, updateReview } from "@/lib/api";
+import { getValidImageUrl, PLACEHOLDER_IMAGE } from "@/types/api";
 import type { ApiOrder, ApiOrderItem, ApiProduct } from "@/types/api";
 import { toast } from "sonner";
 import {
@@ -103,11 +104,11 @@ function getOrderItemProductId(item: ApiOrderItem): string | undefined {
 
 function getOrderItemImage(item: ApiOrderItem, fallbackProduct?: ApiProduct): string {
   const img = (item as any).imageUrl || (item as any).product?.thumbnail || (item as any).product?.imageUrl || (item as any).product?.baseImageUrl?.[0];
-  if (img) return img;
+  if (img) return getValidImageUrl(img);
 
   const variant = item.variantId && typeof item.variantId === "object" ? item.variantId : null;
   if (Array.isArray(variant?.images) && variant.images.length && typeof variant.images[0] === "string") {
-    return variant.images[0];
+    return getValidImageUrl(variant.images[0]);
   }
 
   const fromProductLike = (p: unknown): string | undefined => {
@@ -124,16 +125,16 @@ function getOrderItemImage(item: ApiOrderItem, fallbackProduct?: ApiProduct): st
 
   const variantProduct = variant?.productId;
   const variantImage = fromProductLike(variantProduct);
-  if (variantImage) return variantImage;
+  if (variantImage) return getValidImageUrl(variantImage);
 
   const product = item.productId;
   const productImage = fromProductLike(product);
-  if (productImage) return productImage;
+  if (productImage) return getValidImageUrl(productImage);
 
   const fallbackImage = fromProductLike(fallbackProduct);
-  if (fallbackImage) return fallbackImage;
+  if (fallbackImage) return getValidImageUrl(fallbackImage);
 
-  return "https://picsum.photos/seed/gift/400/400";
+  return PLACEHOLDER_IMAGE;
 }
 
 function getOrderItemCount(order: ApiOrder): number {

@@ -1,5 +1,5 @@
 import { axiosInstance } from "@/lib/axios";
-import { verifyPayment } from "@/lib/api";
+import { verifyPayment, cancelPaymentOrder } from "@/lib/api";
 import { API_ENDPOINTS } from "@/constants/api";
 
 type RazorpayCreateOptions = {
@@ -100,12 +100,23 @@ export async function openRazorpayCheckout(params: {
           });
           resolve();
         } catch (err) {
+          try {
+            await cancelPaymentOrder(gatewayOrderId);
+          } catch (cancelErr) {
+            console.error('[openRazorpayCheckout] Failed to cancel order status after verification failure:', cancelErr);
+          }
           reject(err);
         }
       },
       modal: {
-        ondismiss: () => {
+        ondismiss: async () => {
           if (!isPaymentResolved) {
+            isPaymentResolved = true;
+            try {
+              await cancelPaymentOrder(gatewayOrderId);
+            } catch (cancelErr) {
+              console.error('[openRazorpayCheckout] Failed to cancel order status on dismiss:', cancelErr);
+            }
             reject(new Error('Payment cancelled'));
           }
         }
@@ -118,9 +129,16 @@ export async function openRazorpayCheckout(params: {
     
     // Handle payment failed event
     if (typeof rzp.on === "function") {
-      rzp.on('payment.failed', function (response: any) {
-        isPaymentResolved = true;
-        reject(new Error(response?.error?.description || 'Payment failed'));
+      rzp.on('payment.failed', async function (response: any) {
+        if (!isPaymentResolved) {
+          isPaymentResolved = true;
+          try {
+            await cancelPaymentOrder(gatewayOrderId);
+          } catch (cancelErr) {
+            console.error('[openRazorpayCheckout] Failed to cancel order status on payment failed event:', cancelErr);
+          }
+          reject(new Error(response?.error?.description || 'Payment failed'));
+        }
       });
     }
     

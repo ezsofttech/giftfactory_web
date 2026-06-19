@@ -116,6 +116,7 @@ export const API_ENDPOINTS = {
   payment: {
     createOrder: `${BASE}/payment/orders`,
     verifyPayment: `${BASE}/payment/verify`,
+    cancelPaymentOrder: (razorpayOrderId: string) => `${BASE}/payment/orders/${encodeURIComponent(razorpayOrderId)}/cancel`,
     returnsV2Online: `${BASE}/returns-v2/online`,
     returnsV2List: `${BASE}/returns-v2`,
     returnsV2Detail: (returnNumber: string) => `${BASE}/returns-v2/${encodeURIComponent(returnNumber)}`,
