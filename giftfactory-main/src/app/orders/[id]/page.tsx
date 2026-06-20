@@ -37,7 +37,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import type { ApiAddress, ApiOrder, ApiOrderItem, ApiProduct } from "@/types/api";
-import { apiAddressPostalCode, apiAddressStreet, getValidImageUrl } from "@/types/api";
+import { apiAddressPostalCode, apiAddressStreet, getValidImageUrl, ReturnReasonEnum } from "@/types/api";
 
 const TRACKING_STAGES = [
   { key: "placed", label: "Order Placed", icon: ShoppingCart, status: "CREATED" },
@@ -555,6 +555,12 @@ export default function OrderDetailPage({
   const [returnRequestType, setReturnRequestType] = useState<"return" | "exchange">("return");
   const [returnReason, setReturnReason] = useState("");
   const [returnComment, setReturnComment] = useState("");
+  const [refundReceivingSource, setRefundReceivingSource] = useState<"ORIGINAL_SOURCE" | "REWARDS" | "UPI" | "BANK_TRANSFER" | "">("");
+  const [upiId, setUpiId] = useState("");
+  const [accountHolderName, setAccountHolderName] = useState("");
+  const [bankName, setBankName] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
+  const [ifscCode, setIfscCode] = useState("");
   const [returnItem, setReturnItem] = useState<{
     productId: string;
     variantId?: string | null;
@@ -589,6 +595,12 @@ export default function OrderDetailPage({
       setReturnComment("");
       setReturnItem(null);
       setReturnImages([]);
+      setRefundReceivingSource("");
+      setUpiId("");
+      setAccountHolderName("");
+      setBankName("");
+      setAccountNumber("");
+      setIfscCode("");
       queryClient.invalidateQueries({ queryKey: ["customer", "order", idOrNumber] });
       if (order?.orderNumber) {
         queryClient.invalidateQueries({ queryKey: ["customer", "order", order.orderNumber, "returns-v2-list"] });
@@ -657,9 +669,10 @@ export default function OrderDetailPage({
   };
 
   const submitReturnOrExchange = () => {
+    if (!order) return;
     const trimmedReason = returnReason.trim();
     if (!trimmedReason) {
-      toast.error("Please enter a reason");
+      toast.error("Please select a reason");
       return;
     }
     if (!returnItem) {
@@ -667,9 +680,9 @@ export default function OrderDetailPage({
       return;
     }
 
-    returnRequestV2Mutation.mutate({
+    const payload: any = {
       orderNumber: order?.orderNumber ?? order?._id ?? idOrNumber,
-      returnType: returnRequestType === "exchange" ? "EXCHANGE" : "RETURN",
+      returnType: returnRequestType === "exchange" ? "EXCHANGE" : "REFUND",
       reason: trimmedReason,
       remarks: returnComment.trim() || undefined,
       items: [
@@ -681,7 +694,61 @@ export default function OrderDetailPage({
         },
       ],
       images: returnImages.map((img) => img.key),
-    });
+    };
+
+    if (returnRequestType === "return") {
+      const isCod = (order as any).paymentMode === "COD" || order.paymentMethod?.toUpperCase() === "COD";
+
+      if (!refundReceivingSource) {
+        toast.error("Please select a refund method");
+        return;
+      }
+
+      payload.refundReceivingSource = refundReceivingSource;
+
+      if (isCod) {
+        if (refundReceivingSource === "ORIGINAL_SOURCE") {
+          toast.error("Original source refund is not available for COD orders");
+          return;
+        }
+
+        if (refundReceivingSource === "UPI") {
+          if (!upiId.trim()) {
+            toast.error("Please enter your UPI ID");
+            return;
+          }
+          payload.upiId = upiId.trim();
+        } else if (refundReceivingSource === "BANK_TRANSFER") {
+          if (!accountHolderName.trim()) {
+            toast.error("Please enter the account holder name");
+            return;
+          }
+          if (!bankName.trim()) {
+            toast.error("Please enter the bank name");
+            return;
+          }
+          if (!accountNumber.trim()) {
+            toast.error("Please enter the account number");
+            return;
+          }
+          if (!ifscCode.trim()) {
+            toast.error("Please enter the IFSC code");
+            return;
+          }
+          payload.accountHolderName = accountHolderName.trim();
+          payload.bankName = bankName.trim();
+          payload.accountNumber = accountNumber.trim();
+          payload.ifscCode = ifscCode.trim();
+        }
+      } else {
+        if (refundReceivingSource !== "ORIGINAL_SOURCE" && refundReceivingSource !== "REWARDS") {
+          toast.error("Only Original Source or Rewards refunds are supported for online prepaid orders");
+          return;
+        }
+      }
+    }
+
+    returnRequestV2Mutation.mutate(payload);
   };
 
   const submitSupportCase = () => {
@@ -1245,6 +1312,13 @@ export default function OrderDetailPage({
                                         setReturnReason("");
                                         setReturnComment("");
                                         setReturnImages([]);
+                                        const isCod = (order as any)?.paymentMode === "COD" || order?.paymentMethod?.toUpperCase() === "COD";
+                                        setRefundReceivingSource(isCod ? "UPI" : "ORIGINAL_SOURCE");
+                                        setUpiId("");
+                                        setAccountHolderName("");
+                                        setBankName("");
+                                        setAccountNumber("");
+                                        setIfscCode("");
                                         setReturnDialogOpen(true);
                                       }}
                                     >
@@ -1267,6 +1341,12 @@ export default function OrderDetailPage({
                                         setReturnReason("");
                                         setReturnComment("");
                                         setReturnImages([]);
+                                        setRefundReceivingSource("");
+                                        setUpiId("");
+                                        setAccountHolderName("");
+                                        setBankName("");
+                                        setAccountNumber("");
+                                        setIfscCode("");
                                         setReturnDialogOpen(true);
                                       }}
                                     >
@@ -1407,11 +1487,16 @@ export default function OrderDetailPage({
 
             <div className="space-y-1">
               <label className="text-sm font-semibold">Reason *</label>
-              <Input
+              <select
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 value={returnReason}
                 onChange={(e) => setReturnReason(e.target.value)}
-                placeholder={returnRequestType === "exchange" ? "Wrong size / color, want exchange" : "Product damaged / not as expected"}
-              />
+              >
+                <option value="" disabled>Select a reason</option>
+                <option value={ReturnReasonEnum.CONFLICT}>Conflict</option>
+                <option value={ReturnReasonEnum.DAMAGE}>Damage</option>
+                <option value={ReturnReasonEnum.OTHER}>Other</option>
+              </select>
             </div>
 
             <div className="space-y-1">
@@ -1424,6 +1509,84 @@ export default function OrderDetailPage({
                 className="resize-none"
               />
             </div>
+
+            {returnRequestType === "return" && (
+              <div className="space-y-4 border-t border-border pt-4">
+                <h4 className="text-sm font-semibold text-foreground">Refund Details</h4>
+                
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-muted-foreground">Refund Destination *</label>
+                  <select
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    value={refundReceivingSource}
+                    onChange={(e) => {
+                      setRefundReceivingSource(e.target.value as any);
+                    }}
+                  >
+                    {((order as any).paymentMode === "COD" || order.paymentMethod?.toUpperCase() === "COD") ? (
+                      <>
+                        <option value="UPI">UPI Transfer</option>
+                        <option value="BANK_TRANSFER">Bank Transfer</option>
+                        <option value="REWARDS">Store Rewards</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="ORIGINAL_SOURCE">Original Source (Default Recommended)</option>
+                        <option value="REWARDS">Store Rewards</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+
+                {refundReceivingSource === "UPI" && (
+                  <div className="space-y-1 animate-in fade-in duration-200">
+                    <label className="text-xs font-semibold text-muted-foreground">UPI ID *</label>
+                    <Input
+                      value={upiId}
+                      onChange={(e) => setUpiId(e.target.value)}
+                      placeholder="customer@upi"
+                    />
+                  </div>
+                )}
+
+                {refundReceivingSource === "BANK_TRANSFER" && (
+                  <div className="space-y-3 animate-in fade-in duration-200">
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-muted-foreground">Account Holder Name *</label>
+                      <Input
+                        value={accountHolderName}
+                        onChange={(e) => setAccountHolderName(e.target.value)}
+                        placeholder="John Doe"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-muted-foreground">Bank Name *</label>
+                      <Input
+                        value={bankName}
+                        onChange={(e) => setBankName(e.target.value)}
+                        placeholder="HDFC Bank"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-muted-foreground">Account Number *</label>
+                      <Input
+                        value={accountNumber}
+                        onChange={(e) => setAccountNumber(e.target.value)}
+                        placeholder="1234567890"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-muted-foreground">IFSC Code *</label>
+                      <Input
+                        value={ifscCode}
+                        onChange={(e) => setIfscCode(e.target.value)}
+                        placeholder="HDFC0001234"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Images Upload Section */}
             <div className="space-y-2">

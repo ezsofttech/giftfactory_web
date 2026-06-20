@@ -1217,11 +1217,17 @@ export interface ReturnRequestItemV2 {
 
 export interface ReturnRequestV2Body {
   orderNumber: string;
-  returnType: "RETURN" | "EXCHANGE" | string;
+  returnType: "RETURN" | "REFUND" | "EXCHANGE" | string;
   reason: string;
   remarks?: string;
   items: ReturnRequestItemV2[];
   images?: string[];
+  refundReceivingSource?: "ORIGINAL_SOURCE" | "REWARDS" | "UPI" | "BANK_TRANSFER" | string;
+  upiId?: string;
+  accountHolderName?: string;
+  bankName?: string;
+  accountNumber?: string;
+  ifscCode?: string;
 }
 
 export async function createOnlineReturnRequestV2(

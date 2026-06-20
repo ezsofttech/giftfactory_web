@@ -419,6 +419,12 @@ export type OrderStatus =
   | "REFUND_COMPLETED"
   | string;
 
+export enum ReturnReasonEnum {
+  CONFLICT = 'CONFLICT',
+  DAMAGE = 'DAMAGE',
+  OTHER = 'OTHER',
+}
+
 export interface ApiOrderItem {
   productId?: string | ApiProduct | null;
   variantId?: (ApiProductVariant & { productId?: ApiProduct | string | null }) | string | null;
