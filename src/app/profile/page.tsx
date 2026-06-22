@@ -113,7 +113,7 @@ export default function ProfilePage() {
             variant="outline"
             size="sm"
             onClick={() => signOut({ callbackUrl: "/" })}
-            className="shrink-0 gap-1.5 text-destructive border-destructive/30 hover:bg-destructive hover:text-white hover:border-destructive transition-colors"
+            className="shrink-0 gap-1.5 text-destructive bg-pink-300 border-pink-300  transition-colors"
           >
             <LogOut className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Logout</span>

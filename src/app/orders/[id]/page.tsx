@@ -591,7 +591,7 @@ function OrderDetailPageContent({
   const returnRequestV2Mutation = useMutation({
     mutationFn: createOnlineReturnRequestV2,
     onSuccess: () => {
-      toast.success("Return/Exchange request submitted successfully");
+      toast.success("Refund/Exchange request submitted successfully");
       setReturnDialogOpen(false);
       setReturnReason("");
       setReturnComment("");
@@ -684,7 +684,7 @@ function OrderDetailPageContent({
 
     const payload: any = {
       orderNumber: order?.orderNumber ?? order?._id ?? idOrNumber,
-      returnType: returnRequestType === "exchange" ? "EXCHANGE" : "REFUND",
+      returnType: returnRequestType === "exchange" ? "SAME_PRODUCT_EXCHANGE" : "REFUND",
       reason: trimmedReason,
       remarks: returnComment.trim() || undefined,
       items: [
@@ -1085,7 +1085,7 @@ function OrderDetailPageContent({
                     </div>
                     <div>
                       <h3 className="font-bold text-base text-foreground">
-                        {returnDetails.returnType === "EXCHANGE" ? "Exchange Request" : "Return Request"}
+                        {(returnDetails.returnType === "EXCHANGE" || returnDetails.returnType === "SAME_PRODUCT_EXCHANGE") ? "Exchange Request" : "Return Request"}
                       </h3>
                       <p className="text-xs text-muted-foreground mt-0.5 font-medium">
                         #{returnDetails.returnNumber} • Submitted {returnDetails.createdAt ? new Date(returnDetails.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "just now"}
@@ -1270,7 +1270,7 @@ function OrderDetailPageContent({
                                     return (
                                       <div className="mt-1">
                                         <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-pink-100 text-pink-800 uppercase tracking-wider border border-pink-200">
-                                          {returnDetails.returnType === "EXCHANGE" ? "Exchange Requested" : "Return Requested"}
+                                          {(returnDetails.returnType === "EXCHANGE" || returnDetails.returnType === "SAME_PRODUCT_EXCHANGE") ? "Exchange Requested" : "Refund Requested"}
                                         </span>
                                       </div>
                                     );
@@ -1352,7 +1352,7 @@ function OrderDetailPageContent({
                                         setReturnDialogOpen(true);
                                       }}
                                     >
-                                      Exchange
+                                      Same Product Exchange
                                     </Button>
                                   </>
                                 )}
@@ -1466,7 +1466,7 @@ function OrderDetailPageContent({
       <Dialog open={returnDialogOpen} onOpenChange={setReturnDialogOpen}>
         <DialogContent className="sm:max-w-[480px] rounded-2xl">
           <DialogHeader>
-            <DialogTitle>{returnRequestType === "exchange" ? "Request Exchange" : "Request Refund"}</DialogTitle>
+            <DialogTitle>{returnRequestType === "exchange" ? "Request Same Product Exchange" : "Request Refund"}</DialogTitle>
             <DialogDescription>
               We will review your request and update the status in your order timeline.
             </DialogDescription>
