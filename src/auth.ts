@@ -42,10 +42,70 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
         otp: { label: "OTP", type: "text" },
+        idToken: { label: "idToken", type: "text" },
+        name: { label: "name", type: "text" },
+        avtar: { label: "avtar", type: "text" },
+        provider: { label: "provider", type: "text" },
       },
       async authorize(credentials) {
-        if (!credentials?.email) return null;
         const c = credentials as Record<string, unknown>;
+        if (!credentials?.email && !c.idToken) return null;
+
+        // Firebase Login
+        const idToken = c.idToken;
+        if (idToken && typeof idToken === "string") {
+          try {
+            const firebasePayload = {
+              idToken,
+              email: c.email ? String(c.email) : undefined,
+              name: c.name ? String(c.name) : undefined,
+              avtar: c.avtar ? String(c.avtar) : (c.avatar ? String(c.avatar) : undefined),
+              provider: c.provider ? String(c.provider) : undefined,
+            };
+
+            const firebaseLoginUrl = getCleanUrl("/customer/auth/firebase");
+            console.log("[Auth.ts] Fetching firebaseLoginUrl:", firebaseLoginUrl, "with payload:", JSON.stringify(firebasePayload));
+            const res = await fetch(firebaseLoginUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(firebasePayload),
+            });
+
+            const json = await res.json().catch(() => ({}));
+            console.log("[Auth.ts] firebase auth response status:", res.status, "response body:", JSON.stringify(json));
+            if (!res.ok) {
+              console.error("[Auth.ts] firebase auth response not ok");
+              return null;
+            }
+
+            const data = json.data || json;
+            const accessToken = json.accessToken || data.accessToken;
+            const refreshToken = json.refreshToken || data.refreshToken;
+            const userId = data._id ?? data.id ?? data.userId ?? data.customerId;
+            const customerId = data.customerId;
+            const name = data.fullName || data.name || data.email;
+            const email = data.email;
+
+            if (!accessToken || !email) {
+              console.error("[Auth.ts] missing accessToken or email in parsed response:", { accessToken: !!accessToken, email });
+              return null;
+            }
+
+            return {
+              id: String(userId),
+              email,
+              name: name ?? email,
+              image: data.avatar || data.image || data.avtar || null,
+              accessToken,
+              refreshToken,
+              userId: String(userId),
+              customerId: customerId ? String(customerId) : undefined,
+            };
+          } catch (err) {
+            console.error("Firebase auth error in authorize:", err);
+            return null;
+          }
+        }
 
         // Signup: session created from tokens returned by otp-verification (no backend call)
         const signupToken = c._signup === "1" && c.accessToken;
