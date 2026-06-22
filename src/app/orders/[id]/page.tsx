@@ -3,9 +3,9 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
-import { use, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, use, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -395,12 +395,14 @@ function buildInvoiceHtml(order: ApiOrder): string {
 </html>`;
 }
 
-export default function OrderDetailPage({
+function OrderDetailPageContent({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const idOrNumber = use(params).id;
+  const searchParams = useSearchParams();
+  const page = searchParams.get("page") || "1";
   const queryClient = useQueryClient();
   const { status: sessionStatus, data: sessionData } = useSession();
   const router = useRouter();
@@ -905,7 +907,7 @@ export default function OrderDetailPage({
     return (
       <div className="container mx-auto px-4 py-8 text-center text-destructive">
         <p>{(error as Error)?.message ?? "Order not found"}</p>
-        <Link href="/orders" className="mt-4 inline-block">
+        <Link href={`/orders?page=${page}`} className="mt-4 inline-block">
           <Button variant="outline"><ChevronLeft className="mr-2 h-4 w-4" /> Back to Orders</Button>
         </Link>
       </div>
@@ -937,7 +939,7 @@ export default function OrderDetailPage({
   return (
     <div className="container mx-auto px-4 py-6 max-w-6xl">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <Link href="/orders">
+        <Link href={`/orders?page=${page}`}>
           <Button variant="ghost" className="gap-2 -ml-2">
             <ChevronLeft className="h-4 w-4" /> Order Details
           </Button>
@@ -1753,5 +1755,27 @@ export default function OrderDetailPage({
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function OrderDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  return (
+    <Suspense
+      fallback={
+        <div className="container mx-auto px-4 py-8">
+          <div className="animate-pulse space-y-4">
+            <div className="h-8 w-48 bg-muted rounded" />
+            <div className="h-64 bg-muted rounded" />
+            <div className="h-32 bg-muted rounded" />
+          </div>
+        </div>
+      }
+    >
+      <OrderDetailPageContent params={params} />
+    </Suspense>
   );
 }

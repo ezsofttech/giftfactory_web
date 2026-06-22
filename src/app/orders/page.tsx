@@ -160,7 +160,14 @@ function OrderHistoryPageContent() {
   const queryClient = useQueryClient();
   const { openAuthModal } = useAuthModal();
   const authOpenedRef = useRef(false);
-  const [page, setPage] = useState(1);
+  const searchParams = useSearchParams();
+  const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10) || 1);
+  const setPage = (newPage: number | ((p: number) => number)) => {
+    const nextVal = typeof newPage === "function" ? newPage(page) : newPage;
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("page", nextVal.toString());
+    router.push(`/orders?${params.toString()}`);
+  };
   const [selectedRatings, setSelectedRatings] = useState<Record<string, number>>({});
   const [submittingReviewProductId, setSubmittingReviewProductId] = useState<string | null>(null);
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
@@ -392,7 +399,7 @@ function OrderHistoryPageContent() {
         <div className="bg-[#f9fafb] px-4 py-3 sm:px-6 sm:py-4 border-b border-gray-200 flex flex-wrap justify-between items-center gap-3">
           <div className="space-y-1">
             <Link
-              href={`/orders/${order._id}`}
+              href={`/orders/${order._id}?page=${page}`}
               className="font-bold text-sm sm:text-base text-gray-900 hover:text-primary transition-colors hover:underline"
             >
               {order.orderNumber ? `Order #${order.orderNumber}` : `Order #${order._id.slice(-8).toUpperCase()}`}
@@ -423,7 +430,7 @@ function OrderHistoryPageContent() {
               <p className="font-bold text-sm sm:text-base text-gray-950">₹{total.toLocaleString("en-IN")}</p>
             </div>
             <Button size="sm" asChild className="h-8 text-xs font-semibold rounded-lg bg-pink-600 hover:bg-pink-700 text-white hover:text-white border-none">
-              <Link href={`/orders/${order._id}`}>
+              <Link href={`/orders/${order._id}?page=${page}`}>
                 View Details
               </Link>
             </Button>
