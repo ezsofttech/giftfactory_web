@@ -1324,7 +1324,7 @@ function OrderDetailPageContent({
                                         setReturnDialogOpen(true);
                                       }}
                                     >
-                                      Return
+                                      REFUND
                                     </Button>
                                     <Button
                                       size="sm"
@@ -1466,7 +1466,7 @@ function OrderDetailPageContent({
       <Dialog open={returnDialogOpen} onOpenChange={setReturnDialogOpen}>
         <DialogContent className="sm:max-w-[480px] rounded-2xl">
           <DialogHeader>
-            <DialogTitle>{returnRequestType === "exchange" ? "Request Exchange" : "Request Return"}</DialogTitle>
+            <DialogTitle>{returnRequestType === "exchange" ? "Request Exchange" : "Request Refund"}</DialogTitle>
             <DialogDescription>
               We will review your request and update the status in your order timeline.
             </DialogDescription>
