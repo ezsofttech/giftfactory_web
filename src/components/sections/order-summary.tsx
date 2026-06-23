@@ -66,9 +66,9 @@ export function OrderSummary({ carts, productMap = new Map(), appliedCoupon }: O
   const discountAmount = appliedCoupon
     ? appliedCoupon.discountType === "percentage"
       ? Math.min(
-          Math.round((subtotal * appliedCoupon.discountValue) / 100),
-          appliedCoupon.maxDiscountAmount > 0 ? appliedCoupon.maxDiscountAmount : Infinity
-        )
+        Math.round((subtotal * appliedCoupon.discountValue) / 100),
+        appliedCoupon.maxDiscountAmount > 0 ? appliedCoupon.maxDiscountAmount : Infinity
+      )
       : Math.min(appliedCoupon.discountValue, appliedCoupon.maxDiscountAmount > 0 ? appliedCoupon.maxDiscountAmount : appliedCoupon.discountValue)
     : 0;
 

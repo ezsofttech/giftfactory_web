@@ -421,9 +421,8 @@ export function ProfileInfo({ user, isLoading }: ProfileInfoProps) {
               Edit Profile
             </Button>
             <Button
-              key="change-pwd-btn"
+              key="edit-pwd-btn"
               type="button"
-              variant="outline"
               className="rounded-full px-8"
               onClick={(e) => {
                 e.preventDefault();

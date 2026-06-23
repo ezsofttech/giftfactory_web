@@ -95,7 +95,7 @@ export default function CartPage() {
       if (status === "authenticated") {
         return fetchCart();
       }
-      
+
       let resolvedCartId = guestCartId;
       if (!resolvedCartId) {
         try {
@@ -206,11 +206,11 @@ export default function CartPage() {
     return guestItems.reduce((sum, item) => {
       const fetchedProduct = item.productId ? productMap.get(item.productId) : undefined;
       const variantObj = fetchedProduct?.variantIds?.find((v) => v._id === item.variantId);
-      
+
       const basePrice = fetchedProduct
         ? (fetchedProduct.price?.sellingPrice ?? fetchedProduct.defaultPrice ?? 0)
         : item.priceAtAddition;
-        
+
       const price = variantObj?.price?.sellingPrice ?? basePrice;
       return sum + price * item.quantity;
     }, 0);
@@ -282,7 +282,7 @@ export default function CartPage() {
         const mappedItems: GuestCartItem[] = cartData.items.map((item: any) => {
           const p = item.productId;
           const productId = typeof p === "object" ? p?._id ?? p?.id : p;
-          
+
           const resolvedVariantId = typeof item.variantId === "object" && item.variantId
             ? item.variantId?._id
             : item.variantId;
@@ -669,7 +669,7 @@ export default function CartPage() {
               <div className="bg-white/90 backdrop-blur-sm border border-gray-100 rounded-3xl p-6 shadow-xl shadow-gray-200/40 divide-y divide-gray-100/60">
                 {sortedGuestItems.map((item, idx) => {
                   const fetchedProduct = item.productId ? productMap.get(item.productId) : undefined;
-                  
+
                   const productInfo = fetchedProduct
                     ? (() => {
                       const p = fetchedProduct as ApiProduct & Record<string, unknown>;
@@ -690,11 +690,11 @@ export default function CartPage() {
                   const variantObj = fetchedProduct?.variantIds?.find(
                     (v) => v._id === item.variantId
                   );
-                  
+
                   const basePrice = fetchedProduct
                     ? (fetchedProduct.price?.sellingPrice ?? fetchedProduct.defaultPrice ?? 0)
                     : item.priceAtAddition;
-                    
+
                   const baseMrp = fetchedProduct
                     ? (fetchedProduct.price?.mrp ?? fetchedProduct.mrp ?? basePrice * 1.5)
                     : item.priceAtAddition * 1.5;

@@ -73,7 +73,7 @@ function getProductId(item: ApiCartItem): string {
 
 function resolveItemIds(item: ApiCartItem, productMap?: Map<string, ApiProduct>) {
   const productId = typeof item.productId === "string" ? item.productId : (item.productId as any)?._id ?? "";
-  
+
   // 1. Get raw variantId
   let variantId = (item as any).variantId;
   if (variantId && typeof variantId === "object") {
@@ -293,7 +293,7 @@ export function CheckoutForm({ carts, cartId, productMap, appliedCoupon, onCoupo
       // Pre-fill from active address if the form address fields are currently empty
       const currentLine1 = form.getValues("addressLine1");
       const currentCity = form.getValues("city");
-      
+
       if (!currentLine1 && !currentCity) {
         const stored = typeof window !== "undefined" ? localStorage.getItem("gf_active_address") : null;
         if (stored) {
@@ -460,13 +460,13 @@ export function CheckoutForm({ carts, cartId, productMap, appliedCoupon, onCoupo
   async function handleRedeemLoyalty() {
     const points = parseInt(loyaltyPointsInput, 10);
     const available = loyaltyRes?.data?.points ?? 0;
-    
+
     const allowedPoints = [100, 250, 500, 1000];
     if (isNaN(points) || points < 100 || !allowedPoints.includes(points)) {
       setLoyaltyError("Points must be one of the following values: 100, 250, 500, 1000");
       return;
     }
-    
+
     if (points > available) {
       setLoyaltyError(`You cannot redeem more than your available balance of ${available} coins.`);
       return;
@@ -557,7 +557,7 @@ export function CheckoutForm({ carts, cartId, productMap, appliedCoupon, onCoupo
       form.setValue("discountCode", couponCode);
       toast.success(`Successfully redeemed ${points} coins! Discount coupon applied.`);
       setLoyaltyPointsInput("");
-      
+
       // Invalidate query to refresh remaining coins balance
       void refetchLoyalty();
     } catch (err: any) {
@@ -718,12 +718,12 @@ export function CheckoutForm({ carts, cartId, productMap, appliedCoupon, onCoupo
 
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
           console.log(`[checkout-form] polling order status (attempt ${attempt}/${maxAttempts})...`);
-          
+
           const ordersRes = await fetchOrders({ limit: 10 });
           const orders = ordersRes?.data ?? [];
-          
-          matchedOrder = orders.find((o: any) => 
-            o.requestId === targetRequestId || 
+
+          matchedOrder = orders.find((o: any) =>
+            o.requestId === targetRequestId ||
             o.request_id === targetRequestId ||
             o.orderRequestId === targetRequestId ||
             o.id === targetRequestId ||
@@ -1328,7 +1328,7 @@ export function CheckoutForm({ carts, cartId, productMap, appliedCoupon, onCoupo
                         type="button"
                         onClick={handleRedeemLoyalty}
                         disabled={
-                          loyaltyRedeemLoading || 
+                          loyaltyRedeemLoading ||
                           !loyaltyPointsInput.trim()
                         }
                         className="shrink-0 bg-primary text-primary-foreground shadow-md hover:bg-primary/90"
@@ -1390,11 +1390,10 @@ export function CheckoutForm({ carts, cartId, productMap, appliedCoupon, onCoupo
                           </FormControl>
                           <FormLabel
                             htmlFor={`fp-${value}`}
-                            className={`flex flex-col flex-1 gap-1 cursor-pointer rounded-lg border-2 p-3 transition-all ${
-                              field.value === value
+                            className={`flex flex-col flex-1 gap-1 cursor-pointer rounded-lg border-2 p-3 transition-all ${field.value === value
                                 ? "border-primary bg-primary/5 text-primary"
                                 : "border-border bg-background hover:border-primary/40 hover:bg-muted/40"
-                            }`}
+                              }`}
                           >
                             <div className="flex items-center gap-1.5">
                               <Icon className="h-4 w-4 shrink-0 text-primary" />
@@ -1513,8 +1512,8 @@ export function CheckoutForm({ carts, cartId, productMap, appliedCoupon, onCoupo
                           <FormLabel
                             htmlFor={`pm-${value}`}
                             className={`flex min-w-0 cursor-pointer items-center gap-3 rounded-lg border-2 px-3 py-3 transition-all sm:px-4 ${field.value === value
-                                ? "border-primary bg-primary/5 text-primary"
-                                : "border-border bg-background hover:border-primary/40 hover:bg-muted/40"
+                              ? "border-primary bg-primary/5 text-primary"
+                              : "border-border bg-background hover:border-primary/40 hover:bg-muted/40"
                               }`}
                           >
                             <Icon className="h-4 w-4 shrink-0" />
