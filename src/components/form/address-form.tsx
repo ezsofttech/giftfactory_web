@@ -84,6 +84,42 @@ export function AddressForm({
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <div className="flex justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="text-xs font-semibold flex items-center gap-1.5 rounded-full border-primary/30 hover:bg-primary/5 text-primary cursor-pointer"
+            onClick={async () => {
+              try {
+                const { toast } = await import("sonner");
+                const { MapPin } = await import("lucide-react");
+                toast.loading("Detecting your location...");
+                const { autoDetectLocation } = await import("@/lib/location");
+                const detected = await autoDetectLocation();
+                toast.dismiss();
+                if (detected) {
+                  form.setValue("address", detected.formattedAddress || detected.addressLine1 || "");
+                  form.setValue("city", detected.city || "");
+                  form.setValue("state", detected.state || "");
+                  form.setValue("country", detected.country || "INDIA");
+                  form.setValue("zipCode", detected.zipCode || "");
+                  void form.trigger(["address", "city", "state", "country", "zipCode"]);
+                  toast.success("Location populated successfully!");
+                } else {
+                  toast.error("Could not resolve address from coordinates.");
+                }
+              } catch (e: any) {
+                const { toast } = await import("sonner");
+                toast.dismiss();
+                toast.error(e?.message || "Failed to detect location.");
+              }
+            }}
+          >
+            Detect Location
+          </Button>
+        </div>
+
         <FormField
           control={form.control}
           name="type"

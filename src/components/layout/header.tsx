@@ -105,12 +105,100 @@ export const Header = () => {
   });
   const addresses = (addressesRes?.data ?? []) as ApiAddress[];
   const defaultAddress = addresses.find((a) => a.is_default) ?? addresses[0];
-  const defaultAddressText = defaultAddress
-    ? `${apiAddressStreet(defaultAddress)}, ${defaultAddress.city}`
-    : "";
+
+  const [activeAddress, setActiveAddress] = useState<{
+    street: string;
+    city: string;
+    state: string;
+    postalCode: string;
+    country: string;
+  } | null>(null);
+
+  // Sync active address from localStorage
+  useEffect(() => {
+    const loadActiveAddress = () => {
+      const stored = localStorage.getItem("gf_active_address");
+      if (stored) {
+        try {
+          setActiveAddress(JSON.parse(stored));
+        } catch (e) {
+          console.error("Failed to parse active address", e);
+        }
+      } else {
+        setActiveAddress(null);
+      }
+    };
+
+    loadActiveAddress();
+    window.addEventListener("gf-address-updated", loadActiveAddress);
+    return () => {
+      window.removeEventListener("gf-address-updated", loadActiveAddress);
+    };
+  }, []);
+
+  // Update localStorage when default address from DB is fetched
+  useEffect(() => {
+    if (status === "authenticated" && addresses.length > 0) {
+      const defAddr = addresses.find((a) => a.is_default) ?? addresses[0];
+      if (defAddr) {
+        const mapped = {
+          street: apiAddressStreet(defAddr),
+          city: defAddr.city || "",
+          state: defAddr.state || "",
+          postalCode: apiAddressPostalCode(defAddr),
+          country: defAddr.country || "INDIA",
+        };
+        // Only set if not already set by user explicitly
+        if (!localStorage.getItem("gf_active_address")) {
+          localStorage.setItem("gf_active_address", JSON.stringify(mapped));
+          setActiveAddress(mapped);
+          window.dispatchEvent(new Event("gf-address-updated"));
+        }
+      }
+    }
+  }, [status, addresses]);
+
+  // Attempt auto-detection for guest / users without address
+  useEffect(() => {
+    const checkAndAutoDetect = async () => {
+      const hasStored = localStorage.getItem("gf_active_address");
+      const hasDbAddress = status === "authenticated" && addresses.length > 0;
+      
+      if (!hasStored && !hasDbAddress) {
+        try {
+          const { autoDetectLocation } = await import("@/lib/location");
+          const detected = await autoDetectLocation();
+          if (detected) {
+            const mapped = {
+              street: detected.addressLine1,
+              city: detected.city,
+              state: detected.state,
+              postalCode: detected.zipCode,
+              country: detected.country,
+            };
+            localStorage.setItem("gf_active_address", JSON.stringify(mapped));
+            setActiveAddress(mapped);
+            window.dispatchEvent(new Event("gf-address-updated"));
+          }
+        } catch (err) {
+          console.warn("Failed to auto-detect location:", err);
+        }
+      }
+    };
+    
+    if (status !== "loading") {
+      void checkAndAutoDetect();
+    }
+  }, [status, addresses]);
+
+  const defaultAddressText = activeAddress
+    ? `${activeAddress.street}, ${activeAddress.city}`
+    : (defaultAddress
+      ? `${apiAddressStreet(defaultAddress)}, ${defaultAddress.city}`
+      : "");
   const mobileHeaderAddressLabel = defaultAddressText
-    ? defaultAddressText.length > 15
-      ? defaultAddressText.slice(0, 15) + "…"
+    ? defaultAddressText.length > 40
+      ? defaultAddressText.slice(0, 39) + "…"
       : defaultAddressText
     : "Your address";
   const headerAddressLabel = defaultAddressText
@@ -142,15 +230,23 @@ export const Header = () => {
   const unreadNotificationsCount = notifications.filter((n) => !n.isRead).length;
 
   const openAddressSelector = () => {
-    if (status !== "authenticated") {
-      openAuthModal({ message: "Sign in to manage your address", callbackUrl: "/profile/addresses" });
-      return;
-    }
     setAddressDialogOpen(true);
   };
 
   const handleSetDefaultAddress = async (address: ApiAddress) => {
     if (!address?._id) return;
+
+    // Save as active address first
+    const mapped = {
+      street: apiAddressStreet(address),
+      city: address.city || "",
+      state: address.state || "",
+      postalCode: apiAddressPostalCode(address),
+      country: address.country || "INDIA",
+    };
+    localStorage.setItem("gf_active_address", JSON.stringify(mapped));
+    window.dispatchEvent(new Event("gf-address-updated"));
+
     if (address.is_default) {
       setAddressDialogOpen(false);
       return;
@@ -428,6 +524,24 @@ export const Header = () => {
         <SearchForm />
       </div>
 
+      {/* Location bar - mobile */}
+      <div className="lg:hidden border-t border-border/20 bg-muted/15 py-1.5 px-4">
+        <button
+          type="button"
+          onClick={openAddressSelector}
+          className="w-full flex items-center gap-1.5 text-foreground hover:text-primary text-left cursor-pointer"
+        >
+          <MapPin className="h-3.5 w-3.5 shrink-0 text-primary" />
+          <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap shrink-0">
+            Deliver to:
+          </span>
+          <span className="text-xs font-semibold truncate flex-1">
+            {mobileHeaderAddressLabel}
+          </span>
+          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+        </button>
+      </div>
+
       {/* Single sub-header: All Categories + Nav links */}
       <div className="hidden lg:block border-t border-gray-100 bg-[#fbfbfb]">
         <div className="container mx-auto px-4 flex items-center justify-between gap-4 py-2.5">
@@ -535,48 +649,110 @@ export const Header = () => {
           <DialogHeader>
             <DialogTitle>Select Delivery Address</DialogTitle>
             <DialogDescription>
-              Choose one address to set as your default delivery address.
+              Choose one address to set as your default delivery address or detect your current location.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-2">
-            {addresses.length === 0 ? (
-              <div className="text-sm text-muted-foreground">
-                No saved addresses found. Please add an address from your profile.
-              </div>
-            ) : (
-              addresses.map((address) => {
-                const isCurrentDefault = !!address.is_default;
-                const isSubmitting = settingDefaultAddressId === address._id;
-                return (
-                  <button
-                    key={address._id}
-                    type="button"
-                    onClick={() => handleSetDefaultAddress(address)}
-                    disabled={isSubmitting}
-                    className={`w-full rounded-lg border p-3 text-left transition-colors ${isCurrentDefault
-                      ? "border-primary bg-primary/5"
-                      : "border-border hover:border-primary/40 hover:bg-muted/30"
-                      } ${isSubmitting ? "opacity-60" : ""}`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-foreground break-words">
-                          {apiAddressStreet(address)}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1 break-words">
-                          {address.city}, {address.state} {apiAddressPostalCode(address)}, {address.country}
-                        </p>
-                      </div>
-                      {isCurrentDefault && (
-                        <span className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                          Default
-                        </span>
-                      )}
+          <div className="space-y-3">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full flex items-center justify-center gap-2 rounded-lg border-primary/40 hover:bg-primary/5 text-primary cursor-pointer"
+              onClick={async () => {
+                try {
+                  toast.loading("Detecting your location...");
+                  const { autoDetectLocation } = await import("@/lib/location");
+                  const detected = await autoDetectLocation();
+                  toast.dismiss();
+                  if (detected) {
+                    const mapped = {
+                      street: detected.addressLine1,
+                      city: detected.city,
+                      state: detected.state,
+                      postalCode: detected.zipCode,
+                      country: detected.country,
+                    };
+                    localStorage.setItem("gf_active_address", JSON.stringify(mapped));
+                    window.dispatchEvent(new Event("gf-address-updated"));
+                    toast.success(`Location set to: ${detected.city}, ${detected.zipCode}`);
+                    setAddressDialogOpen(false);
+                  } else {
+                    toast.error("Could not resolve address from your coordinates.");
+                  }
+                } catch (e: any) {
+                  toast.dismiss();
+                  toast.error(e?.message || "Failed to detect location.");
+                }
+              }}
+            >
+              <MapPin className="h-4 w-4 shrink-0" />
+              Use Current Location
+            </Button>
+
+            {status === "authenticated" ? (
+              <>
+                <div className="relative flex py-1 items-center">
+                  <div className="flex-grow border-t border-border"></div>
+                  <span className="flex-shrink mx-4 text-xs text-muted-foreground uppercase font-medium">Or select saved address</span>
+                  <div className="flex-grow border-t border-border"></div>
+                </div>
+
+                <div className="space-y-2">
+                  {addresses.length === 0 ? (
+                    <div className="text-sm text-muted-foreground text-center py-2">
+                      No saved addresses found. Please add an address from your profile.
                     </div>
-                  </button>
-                );
-              })
+                  ) : (
+                    addresses.map((address) => {
+                      const isCurrentDefault = !!address.is_default;
+                      const isSubmitting = settingDefaultAddressId === address._id;
+                      return (
+                        <button
+                          key={address._id}
+                          type="button"
+                          onClick={() => handleSetDefaultAddress(address)}
+                          disabled={isSubmitting}
+                          className={`w-full rounded-lg border p-3 text-left transition-colors cursor-pointer ${isCurrentDefault
+                            ? "border-primary bg-primary/5"
+                            : "border-border hover:border-primary/40 hover:bg-muted/30"
+                            } ${isSubmitting ? "opacity-60" : ""}`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-foreground break-words">
+                                {apiAddressStreet(address)}
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1 break-words">
+                                {address.city}, {address.state} {apiAddressPostalCode(address)}, {address.country}
+                              </p>
+                            </div>
+                            {isCurrentDefault && (
+                              <span className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                                Default
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-4 border border-dashed rounded-lg bg-muted/20">
+                <p className="text-xs text-muted-foreground mb-2">Sign in to view your saved addresses.</p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="rounded-full cursor-pointer"
+                  onClick={() => {
+                    setAddressDialogOpen(false);
+                    openAuthModal();
+                  }}
+                >
+                  Sign In
+                </Button>
+              </div>
             )}
           </div>
 

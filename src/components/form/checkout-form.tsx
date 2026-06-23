@@ -290,6 +290,29 @@ export function CheckoutForm({ carts, cartId, productMap, appliedCoupon, onCoupo
   const lastFilledAddressId = useRef<string | null>(null);
   useEffect(() => {
     if (selectedAddressId === NEW_ADDRESS_VALUE) {
+      // Pre-fill from active address if the form address fields are currently empty
+      const currentLine1 = form.getValues("addressLine1");
+      const currentCity = form.getValues("city");
+      
+      if (!currentLine1 && !currentCity) {
+        const stored = typeof window !== "undefined" ? localStorage.getItem("gf_active_address") : null;
+        if (stored) {
+          try {
+            const addr = JSON.parse(stored);
+            if (addr && (addr.street || addr.city)) {
+              form.setValue("addressLine1", addr.street || "");
+              form.setValue("addressLine2", addr.addressLine2 || "");
+              form.setValue("city", addr.city || "");
+              form.setValue("state", addr.state || "");
+              form.setValue("country", addr.country || "INDIA");
+              form.setValue("zipCode", addr.postalCode || addr.zipCode || "");
+              void form.trigger(["addressLine1", "city", "state", "country", "zipCode"]);
+            }
+          } catch (e) {
+            console.error("Failed to parse active address in checkout", e);
+          }
+        }
+      }
       lastFilledAddressId.current = null;
       return;
     }
@@ -900,6 +923,47 @@ export function CheckoutForm({ carts, cartId, productMap, appliedCoupon, onCoupo
 
             {(selectedAddressId === NEW_ADDRESS_VALUE || addresses.length === 0) && (
               <>
+                <div className="flex justify-end mb-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs font-semibold flex items-center gap-1.5 rounded-full border-primary/30 hover:bg-primary/5 text-primary cursor-pointer"
+                    onClick={async () => {
+                      try {
+                        toast.loading("Detecting your location...");
+                        const { autoDetectLocation } = await import("@/lib/location");
+                        const detected = await autoDetectLocation();
+                        toast.dismiss();
+                        if (detected) {
+                          form.setValue("addressLine1", detected.addressLine1 || "");
+                          form.setValue("addressLine2", detected.addressLine2 || "");
+                          form.setValue("city", detected.city || "");
+                          form.setValue("state", detected.state || "");
+                          form.setValue("country", detected.country || "INDIA");
+                          form.setValue("zipCode", detected.zipCode || "");
+                          if (detected.latitude && detected.longitude) {
+                            setCoords({
+                              latitude: detected.latitude,
+                              longitude: detected.longitude,
+                            });
+                          }
+                          void form.trigger(["addressLine1", "city", "state", "country", "zipCode"]);
+                          toast.success("Address detected successfully!");
+                        } else {
+                          toast.error("Could not resolve address from coordinates.");
+                        }
+                      } catch (e: any) {
+                        toast.dismiss();
+                        toast.error(e?.message || "Failed to detect location.");
+                      }
+                    }}
+                  >
+                    <MapPin className="h-3 w-3" />
+                    Detect Current Location
+                  </Button>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
