@@ -8,6 +8,11 @@ AWS_REGION="${AWS_REGION:-ap-south-1}"
 ECR_REPOSITORY="${ECR_REPOSITORY:-giftfactory-web}"
 DEPLOY_ENV="${DEPLOY_ENV:-development}"
 IMAGE_TAG="${IMAGE_TAG:-$([ "$DEPLOY_ENV" = production ] && echo prod-latest || echo dev-latest)}"
+AWS_PROFILE="${AWS_PROFILE:-}"
+
+if [ -n "$AWS_PROFILE" ]; then
+  export AWS_PROFILE
+fi
 
 if [ -f .env ]; then
   echo "Loading NEXT_PUBLIC_* vars from .env..."
@@ -26,7 +31,7 @@ NEXT_PUBLIC_API_BASE_URL="${NEXT_PUBLIC_API_BASE_URL:?'Set NEXT_PUBLIC_API_BASE_
 NEXT_PUBLIC_SITE_URL="${NEXT_PUBLIC_SITE_URL:-https://dev-giftfactory.ezzme.com}"
 NEXT_PUBLIC_RAZORPAY_KEY_ID="${NEXT_PUBLIC_RAZORPAY_KEY_ID:-}"
 
-ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+ACCOUNT_ID="${ECR_ACCOUNT_ID:-$(aws sts get-caller-identity --query Account --output text)}"
 REGISTRY="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 IMAGE_URI="${REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
 
@@ -47,6 +52,13 @@ docker build --platform linux/amd64 \
   -t "$IMAGE_URI" .
 
 docker push "$IMAGE_URI"
+
+# ECS task definitions use dev-latest / prod-latest (not :latest). Publish both for development.
+if [ "$IMAGE_TAG" = "dev-latest" ]; then
+  docker tag "$IMAGE_URI" "${REGISTRY}/${ECR_REPOSITORY}:latest"
+  docker push "${REGISTRY}/${ECR_REPOSITORY}:latest"
+  echo "Also pushed :latest (alias for development)"
+fi
 
 echo "Done. Image pushed to $IMAGE_URI"
 echo ""

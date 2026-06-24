@@ -55,6 +55,16 @@ jobs:
             NEXT_PUBLIC_RAZORPAY_KEY_ID=${{ secrets.NEXT_PUBLIC_RAZORPAY_KEY_ID }}
             APP_ENV=${{ env.APP_ENV }}
 
+      - name: Verify image in ECR
+        run: |
+          aws ecr describe-images \
+            --repository-name "${ECR_REPOSITORY}" \
+            --image-ids "imageTag=${IMAGE_TAG}" \
+            --region "${AWS_REGION}" \
+            --query 'imageDetails[0].imageTags' \
+            --output text
+          echo "Image ${ECR_REPOSITORY}:${IMAGE_TAG} is available in ECR."
+
       - name: Deploy ECS with rollback on failure
         run: |
           set -euo pipefail

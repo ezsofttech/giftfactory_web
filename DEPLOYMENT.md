@@ -39,8 +39,38 @@ Port **3000** · `HOSTNAME=0.0.0.0`
 
 | Tag | Environment |
 |-----|-------------|
-| `dev-latest` | Development |
+| `dev-latest` | Development (**required** — ECS pulls this tag) |
 | `prod-latest` | Production |
+
+> **Important:** The AWS console default push uses `:latest`, but ECS task definitions use **`dev-latest`** (development) or **`prod-latest`** (production). Pushing only `:latest` causes `CannotPullContainerError: ... dev-latest: not found`.
+
+### Manual ECR push (correct tags)
+
+```bash
+export AWS_REGION=ap-south-1
+export ECR_ACCOUNT_ID=354130615738   # your AWS account
+REGISTRY="${ECR_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+
+aws ecr get-login-password --region "$AWS_REGION" \
+  | docker login --username AWS --password-stdin "$REGISTRY"
+
+cd giftfactory_web
+./build-and-push-ecr.sh
+# Pushes :dev-latest (and :latest as alias for development)
+```
+
+### Already pushed `:latest` only? (quick fix, no rebuild)
+
+```bash
+chmod +x scripts/retag-ecr-dev-latest.sh
+AWS_PROFILE=giftfactory ECR_ACCOUNT_ID=354130615738 ./scripts/retag-ecr-dev-latest.sh
+
+aws ecs update-service \
+  --cluster giftfactory-cluster \
+  --service giftfactory-web-development \
+  --force-new-deployment \
+  --region ap-south-1
+```
 
 ## GitHub Actions
 
