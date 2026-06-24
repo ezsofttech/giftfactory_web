@@ -1,45 +1,30 @@
 "use client";
 
-import { useSession } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthModal } from "@/provider/auth-modal-provider";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { ArrowLeft, User, Lock, MapPin } from "lucide-react";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ArrowLeft, User, MapPin, UserX, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
-import { changePassword } from "@/lib/api";
-
-const changePasswordSchema = z
-  .object({
-    password: z.string().min(6, "At least 6 characters").max(12, "At most 12 characters"),
-    newPassword: z.string().min(6, "At least 6 characters").max(12, "At most 12 characters"),
-    rePassword: z.string(),
-  })
-  .refine((data) => data.newPassword === data.rePassword, {
-    message: "New passwords do not match",
-    path: ["rePassword"],
-  });
-
-type ChangePasswordForm = z.infer<typeof changePasswordSchema>;
+import { deactivateProfile } from "@/lib/api";
 
 export default function SettingsPage() {
   const { status } = useSession();
   const { openAuthModal } = useAuthModal();
   const router = useRouter();
   const authOpenedRef = useRef(false);
+  const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
+  const [isDeactivating, setIsDeactivating] = useState(false);
 
   useEffect(() => {
     if (status !== "authenticated" && status !== "loading" && !authOpenedRef.current) {
@@ -49,22 +34,18 @@ export default function SettingsPage() {
     }
   }, [status, openAuthModal, router]);
 
-  const form = useForm<ChangePasswordForm>({
-    resolver: zodResolver(changePasswordSchema),
-    defaultValues: { password: "", newPassword: "", rePassword: "" },
-  });
-
-  const onSubmit = async (values: ChangePasswordForm) => {
+  const handleDeactivate = async () => {
+    setIsDeactivating(true);
     try {
-      await changePassword({
-        currentPassword: values.password,
-        newPassword: values.newPassword,
-      });
-      toast.success("Password updated successfully");
-      form.reset();
+      await deactivateProfile();
+      toast.success("Profile deactivated successfully");
+      setShowDeactivateDialog(false);
+      await signOut({ callbackUrl: "/" });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to update password";
+      const message = err instanceof Error ? err.message : "Failed to deactivate profile";
       toast.error(message);
+    } finally {
+      setIsDeactivating(false);
     }
   };
 
@@ -123,61 +104,59 @@ export default function SettingsPage() {
             </Button>
           </div>
 
-          {/* Change password */}
+          {/* Deactivate account */}
           <div>
-            <h3 className="text-sm font-semibold text-foreground mb-3 pb-1 border-b border-border flex items-center gap-2">
-              <Lock className="h-4 w-4 text-muted-foreground" /> Change Password
+            <h3 className="text-sm font-semibold text-destructive mb-3 pb-1 border-b border-border flex items-center gap-2">
+              <UserX className="h-4 w-4 text-destructive" /> Deactivate Account
             </h3>
-            <p className="text-sm text-muted-foreground mb-4">Set a new password for your account.</p>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Current password</FormLabel>
-                      <FormControl>
-                        <Input type="password" placeholder="••••••••" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="newPassword"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>New password</FormLabel>
-                      <FormControl>
-                        <Input type="password" placeholder="••••••••" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="rePassword"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Confirm new password</FormLabel>
-                      <FormControl>
-                        <Input type="password" placeholder="••••••••" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <Button type="submit" className="rounded-full px-8" disabled={form.formState.isSubmitting}>
-                  {form.formState.isSubmitting ? "Updating…" : "Update password"}
-                </Button>
-              </form>
-            </Form>
+            <p className="text-sm text-muted-foreground mb-4">
+              Deactivating your profile will permanently delete your account, order history, and preferences. This action is irreversible.
+            </p>
+            <Button
+              variant="destructive"
+              size="sm"
+              className="rounded-full px-6 font-medium"
+              onClick={() => setShowDeactivateDialog(true)}
+            >
+              Deactivate profile
+            </Button>
           </div>
         </div>
       </div>
+
+      <Dialog open={showDeactivateDialog} onOpenChange={setShowDeactivateDialog}>
+        <DialogContent className="sm:max-w-[420px] rounded-2xl border border-border bg-card p-6 shadow-xl gap-0">
+          <DialogHeader className="flex flex-col items-center text-center gap-2">
+            <div className="h-12 w-12 rounded-full bg-destructive/15 flex items-center justify-center text-destructive mb-2">
+              <AlertTriangle className="h-6 w-6" />
+            </div>
+            <DialogTitle className="text-lg font-bold text-foreground">
+              Deactivate your profile?
+            </DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              Are you sure you want to de-register? This will permanently delete your account and all associated data. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex flex-col sm:flex-row gap-2 mt-6 sm:justify-end">
+            <Button
+              variant="outline"
+              onClick={() => setShowDeactivateDialog(false)}
+              className="rounded-full w-full sm:w-auto"
+              disabled={isDeactivating}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeactivate}
+              className="rounded-full w-full sm:w-auto"
+              disabled={isDeactivating}
+            >
+              {isDeactivating ? "Deactivating..." : "Yes, Deactivate"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

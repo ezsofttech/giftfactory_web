@@ -55,7 +55,7 @@ function getFriendlyAuthError(mode: "otp" | "password", rawError?: string | null
 }
 
 export function SignIn({ callbackUrl, onSuccess }: SignInProps = {}) {
-  const [mode, setMode] = useState<"otp" | "password" | "forgot_password">("otp");
+  const [mode, setMode] = useState<"otp" | "password" | "forgot_password" | "account_recovery">("otp");
   const [otpMode, setOtpMode] = useState<"email" | "phone">("email");
   const [otpStep, setOtpStep] = useState<"email" | "verify">("email");
   const [sendingOtp, setSendingOtp] = useState(false);
@@ -69,6 +69,13 @@ export function SignIn({ callbackUrl, onSuccess }: SignInProps = {}) {
   const [forgotError, setForgotError] = useState("");
   const [forgotLoading, setForgotLoading] = useState(false);
   const [socialLoading, setSocialLoading] = useState(false);
+
+  // Account Recovery States
+  const [recoveryStep, setRecoveryStep] = useState<"email" | "verify">("email");
+  const [recoveryEmail, setRecoveryEmail] = useState("");
+  const [recoveryOtp, setRecoveryOtp] = useState("");
+  const [recoveryError, setRecoveryError] = useState("");
+  const [recoveryLoading, setRecoveryLoading] = useState(false);
 
   const handleFirebaseSignIn = async (providerName: "google" | "facebook") => {
     setSocialLoading(true);
@@ -216,7 +223,7 @@ export function SignIn({ callbackUrl, onSuccess }: SignInProps = {}) {
 
   return (
     <div className="space-y-4">
-      {mode !== "forgot_password" && (
+      {mode !== "forgot_password" && mode !== "account_recovery" && (
         <div className="flex flex-col sm:flex-row gap-2">
           <Button
             type="button"
@@ -292,10 +299,24 @@ export function SignIn({ callbackUrl, onSuccess }: SignInProps = {}) {
                   </FormItem>
                 )}
               />
-              <div className="flex gap-2 pt-2">
+              <div className="space-y-3 pt-2">
                 <Button type="button" className="w-full" onClick={onSendOtpEmail} disabled={sendingOtp}>
                   {sendingOtp ? "Sending…" : "Send OTP"}
                 </Button>
+                <div className="text-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode("account_recovery");
+                      setRecoveryStep("email");
+                      setRecoveryError("");
+                      setRecoveryEmail(otpForm.getValues("identifier") || "");
+                    }}
+                    className="text-xs text-primary hover:underline font-medium"
+                  >
+                    Deactivated account? Recover here
+                  </button>
+                </div>
               </div>
             </form>
           ) : (
@@ -398,7 +419,19 @@ export function SignIn({ callbackUrl, onSuccess }: SignInProps = {}) {
             {passwordForm.formState.errors.password && (
               <p className="text-destructive text-sm mt-1">{String(passwordForm.formState.errors.password.message)}</p>
             )}
-            <div className="flex justify-end pt-1">
+            <div className="flex justify-between items-center pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("account_recovery");
+                  setRecoveryStep("email");
+                  setRecoveryError("");
+                  setRecoveryEmail(passwordForm.getValues("email") || "");
+                }}
+                className="text-xs text-primary hover:underline font-medium"
+              >
+                Recover deactivated account?
+              </button>
               <button
                 type="button"
                 onClick={() => {
@@ -416,7 +449,7 @@ export function SignIn({ callbackUrl, onSuccess }: SignInProps = {}) {
 
           <Button type="submit" className="w-full">Sign In</Button>
         </form>
-      ) : (
+      ) : mode === "forgot_password" ? (
         <div className="space-y-6">
           <div className="space-y-2 text-center">
             <h3 className="font-semibold text-lg">Reset Password</h3>
@@ -599,9 +632,142 @@ export function SignIn({ callbackUrl, onSuccess }: SignInProps = {}) {
             </form>
           )}
         </div>
+      ) : (
+        <div className="space-y-6">
+          <div className="space-y-2 text-center">
+            <h3 className="font-semibold text-lg">Recover Account</h3>
+            <p className="text-xs text-muted-foreground">
+              {recoveryStep === "email"
+                ? "Enter your email to receive an account recovery OTP"
+                : `Enter the OTP sent to ${recoveryEmail} to restore your profile`}
+            </p>
+          </div>
+          {recoveryStep === "email" ? (
+            <form
+              className="space-y-4"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!recoveryEmail || !z.string().email().safeParse(recoveryEmail).success) {
+                  setRecoveryError("Please enter a valid email address.");
+                  return;
+                }
+                setRecoveryLoading(true);
+                setRecoveryError("");
+                try {
+                  const { sendOtp } = await import("@/lib/api");
+                  await sendOtp(recoveryEmail, "email");
+                  setRecoveryStep("verify");
+                  toast.success("OTP sent to your email!");
+                } catch (err: any) {
+                  setRecoveryError(err?.response?.data?.message ?? err?.message ?? "Failed to send OTP.");
+                } finally {
+                  setRecoveryLoading(false);
+                }
+              }}
+            >
+              <div>
+                <label className="text-sm font-medium block mb-2">Email Address</label>
+                <Input
+                  type="email"
+                  placeholder="Enter your email"
+                  className="text-foreground"
+                  value={recoveryEmail}
+                  onChange={(e) => {
+                    setRecoveryEmail(e.target.value);
+                    setRecoveryError("");
+                  }}
+                  required
+                />
+              </div>
+              {recoveryError && <p className="text-sm text-destructive font-medium">{recoveryError}</p>}
+              <div className="flex gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setMode("otp")}
+                  disabled={recoveryLoading}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" className="flex-1" disabled={recoveryLoading}>
+                  {recoveryLoading ? "Sending OTP…" : "Send OTP"}
+                </Button>
+              </div>
+            </form>
+          ) : (
+            <form
+              className="space-y-4"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!recoveryOtp || recoveryOtp.length !== 6) {
+                  setRecoveryError("OTP must be 6 digits.");
+                  return;
+                }
+                setRecoveryLoading(true);
+                setRecoveryError("");
+                try {
+                  const { recoverAccount } = await import("@/lib/api");
+                  await recoverAccount({
+                    email: recoveryEmail,
+                    otp: recoveryOtp,
+                  });
+                  toast.success("Account recovered successfully! You can now sign in.");
+                  setMode("otp");
+                  otpForm.setValue("identifier", recoveryEmail);
+                  setOtpStep("email");
+                } catch (err: any) {
+                  setRecoveryError(err?.response?.data?.message ?? err?.message ?? "Failed to recover account.");
+                } finally {
+                  setRecoveryLoading(false);
+                }
+              }}
+            >
+              <div>
+                <label className="text-sm font-medium block mb-2">Email Address</label>
+                <Input
+                  type="email"
+                  value={recoveryEmail}
+                  readOnly
+                  disabled
+                  className="bg-muted text-foreground disabled:opacity-100"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium block mb-2">OTP</label>
+                <Input
+                  type="text"
+                  maxLength={6}
+                  placeholder="Enter 6-digit OTP"
+                  value={recoveryOtp}
+                  onChange={(e) => {
+                    setRecoveryOtp(e.target.value.replace(/\D/g, ""));
+                    setRecoveryError("");
+                  }}
+                  required
+                />
+              </div>
+              {recoveryError && <p className="text-sm text-destructive font-medium">{recoveryError}</p>}
+              <div className="flex gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setRecoveryStep("email")}
+                  disabled={recoveryLoading}
+                >
+                  Back
+                </Button>
+                <Button type="submit" className="flex-1" disabled={recoveryLoading}>
+                  {recoveryLoading ? "Recovering…" : "Recover Account"}
+                </Button>
+              </div>
+            </form>
+          )}
+        </div>
       )}
 
-      {mode !== "forgot_password" && (
+      {mode !== "forgot_password" && mode !== "account_recovery" && (
         <div className="space-y-4 pt-2">
           <div className="relative flex py-2 items-center">
             <div className="flex-grow border-t border-border"></div>

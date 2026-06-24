@@ -20,6 +20,8 @@ export const API_ENDPOINTS = {
     me: `${BASE}/customer/me`,
     profileUpdate: `${BASE}/customer/profile-update`,
     changePassword: `${BASE}/customer/change-password`,
+    deRegister: `${BASE}/customer/de-register`,
+    accountRecovery: `${BASE}/customer/account-recovery`,
   },
   /** Customer auth (same as auth) – alias for clarity in docs */
   customerAuth: {

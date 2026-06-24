@@ -59,6 +59,7 @@ const PRODUCTS_API_PARAMS = [
   "order",
   "minPrice",
   "maxPrice",
+  "minRating",
 ] as const;
 
 export function normalizeProduct(p: any): ApiProduct {
@@ -668,6 +669,16 @@ export async function getCustomerProfile(token: string): Promise<ApiResponse<unk
 
 export async function changePassword(body: Record<string, string>): Promise<ApiResponse<unknown>> {
   const { data } = await patch(API_ENDPOINTS.auth.changePassword, body);
+  return data;
+}
+
+export async function deactivateProfile(): Promise<ApiResponse<unknown>> {
+  const { data } = await del(API_ENDPOINTS.auth.deRegister);
+  return data;
+}
+
+export async function recoverAccount(body: { email: string; otp: string }): Promise<ApiResponse<unknown>> {
+  const { data } = await patch(API_ENDPOINTS.auth.accountRecovery, body);
   return data;
 }
 
