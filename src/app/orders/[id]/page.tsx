@@ -445,17 +445,26 @@ function OrderDetailPageContent({
   });
 
   const returnsList = returnsV2ListRes?.data as any[] | undefined;
-  const returnReqFromOrder = Array.isArray(returnsList) && returnsList.length > 0 ? returnsList[0] : undefined;
-  const returnNumber = returnReqFromOrder?.returnNumber || returnReqFromOrder?.id || returnReqFromOrder?._id;
 
-  const { data: returnDetailRes } = useQuery({
-    queryKey: ["customer", "return-v2", returnNumber],
-    queryFn: () => fetchReturnRequestV2Detail(returnNumber ?? ""),
-    enabled: !!returnNumber && sessionStatus === "authenticated",
-    retry: false,
+  const returnDetailsQueries = useQueries({
+    queries: (returnsList ?? []).map((ret) => {
+      const rNum = ret.returnNumber || ret.id || ret._id;
+      return {
+        queryKey: ["customer", "return-v2", rNum],
+        queryFn: () => fetchReturnRequestV2Detail(rNum ?? ""),
+        enabled: !!rNum && sessionStatus === "authenticated",
+        retry: false,
+      };
+    }),
   });
 
-  const returnDetails = returnDetailRes?.data || returnReqFromOrder;
+  const allReturnDetails = useMemo(() => {
+    if (!returnsList) return [];
+    return returnsList.map((ret, index) => {
+      const detail = returnDetailsQueries[index]?.data?.data;
+      return detail || ret;
+    });
+  }, [returnsList, returnDetailsQueries]);
   const productIds = useMemo(() => {
     const ids = new Set<string>();
     (order?.items ?? []).forEach((it) => {
@@ -1075,135 +1084,139 @@ function OrderDetailPageContent({
             </CardContent>
           </Card>
 
-          {returnDetails && (
-            <Card className="border-pink-200 bg-pink-50/20 shadow-sm overflow-hidden">
-              <CardContent className="p-4 sm:p-6 space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-pink-100/60 pb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="p-2 bg-pink-100 rounded-lg text-pink-700">
-                      <Package className="h-5 w-5 animate-pulse" />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-base text-foreground">
-                        {(returnDetails.returnType === "EXCHANGE" || returnDetails.returnType === "SAME_PRODUCT_EXCHANGE") ? "Exchange Request" : "Return Request"}
-                      </h3>
-                      <p className="text-xs text-muted-foreground mt-0.5 font-medium">
-                        #{returnDetails.returnNumber} • Submitted {returnDetails.createdAt ? new Date(returnDetails.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "just now"}
-                      </p>
-                    </div>
-                  </div>
-                  <span className={`text-[10px] sm:text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${
-                    returnDetails.status?.toUpperCase() === "PENDING" || returnDetails.status?.toUpperCase() === "REQUESTED"
-                      ? "bg-amber-100 text-amber-800 border border-amber-200"
-                      : returnDetails.status?.toUpperCase() === "APPROVED" || returnDetails.status?.toUpperCase() === "ACCEPTED"
-                      ? "bg-blue-100 text-blue-800 border border-blue-200"
-                      : returnDetails.status?.toUpperCase() === "REJECTED" || returnDetails.status?.toUpperCase() === "FAILED"
-                      ? "bg-red-100 text-red-800 border border-red-200"
-                      : "bg-green-100 text-green-800 border border-green-200"
-                  }`}>
-                    {returnDetails.status?.replace(/_/g, " ")}
-                  </span>
-                </div>
-
-                <div className="grid sm:grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="font-semibold text-muted-foreground block text-xs uppercase tracking-wide">Reason</span>
-                    <span className="font-medium text-foreground mt-1 block">{returnDetails.reason}</span>
-                  </div>
-                  {returnDetails.remarks && (
-                    <div>
-                      <span className="font-semibold text-muted-foreground block text-xs uppercase tracking-wide">Customer Remarks</span>
-                      <span className="text-foreground mt-1 block italic text-xs leading-relaxed bg-white/50 p-2 rounded border border-pink-100/40">
-                        "{returnDetails.remarks}"
+          {allReturnDetails && allReturnDetails.length > 0 && (
+            <div className="space-y-4">
+              {allReturnDetails.map((retDetails: any, idx: number) => (
+                <Card key={retDetails.returnNumber || idx} className="border-pink-200 bg-pink-50/20 shadow-sm overflow-hidden">
+                  <CardContent className="p-4 sm:p-6 space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-pink-100/60 pb-3">
+                      <div className="flex items-center gap-2">
+                        <div className="p-2 bg-pink-100 rounded-lg text-pink-700">
+                          <Package className="h-5 w-5 animate-pulse" />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-base text-foreground">
+                            {(retDetails.returnType === "EXCHANGE" || retDetails.returnType === "SAME_PRODUCT_EXCHANGE") ? "Exchange Request" : "Return Request"}
+                          </h3>
+                          <p className="text-xs text-muted-foreground mt-0.5 font-medium">
+                            #{retDetails.returnNumber} • Submitted {retDetails.createdAt ? new Date(retDetails.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "just now"}
+                          </p>
+                        </div>
+                      </div>
+                      <span className={`text-[10px] sm:text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${
+                        retDetails.status?.toUpperCase() === "PENDING" || retDetails.status?.toUpperCase() === "REQUESTED"
+                          ? "bg-amber-100 text-amber-800 border border-amber-200"
+                          : retDetails.status?.toUpperCase() === "APPROVED" || retDetails.status?.toUpperCase() === "ACCEPTED"
+                          ? "bg-blue-100 text-blue-800 border border-blue-200"
+                          : retDetails.status?.toUpperCase() === "REJECTED" || retDetails.status?.toUpperCase() === "FAILED"
+                          ? "bg-red-100 text-red-800 border border-red-200"
+                          : "bg-green-100 text-green-800 border border-green-200"
+                      }`}>
+                        {retDetails.status?.replace(/_/g, " ")}
                       </span>
                     </div>
-                  )}
-                </div>
 
-                {/* Returned Items */}
-                {Array.isArray(returnDetails.items) && returnDetails.items.length > 0 && (
-                  <div className="border-t border-pink-100/40 pt-3">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Items Requesting Return/Exchange</h4>
-                    <div className="space-y-2">
-                      {returnDetails.items.map((item: any, i: number) => {
-                        const productInfo = productMap.get(item.productId);
-                        const title = item.product?.name || productInfo?.title || item.productName || "Product Item";
-                        const imageUrl = getValidImageUrl(productInfo?.thumbnail || item.imageUrl || "https://picsum.photos/seed/gift/400/400");
-                        return (
-                          <div key={i} className="flex items-center gap-3 bg-white p-2.5 rounded-lg border border-pink-100/40 hover:border-pink-200 transition-colors">
-                            <div className="relative w-12 h-12 rounded overflow-hidden shrink-0 border bg-muted">
-                              <Image src={imageUrl} alt={title} fill className="object-cover" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-sm text-foreground truncate">{title}</p>
-                              {item.remarks && <p className="text-xs text-muted-foreground italic mt-0.5">"{item.remarks}"</p>}
-                            </div>
-                            <div className="text-xs font-bold text-muted-foreground shrink-0 bg-muted px-2.5 py-1 rounded">
-                              Qty: {item.requestedQty || item.quantity || 1}
-                            </div>
-                          </div>
-                        );
-                      })}
+                    <div className="grid sm:grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="font-semibold text-muted-foreground block text-xs uppercase tracking-wide">Reason</span>
+                        <span className="font-medium text-foreground mt-1 block">{retDetails.reason}</span>
+                      </div>
+                      {retDetails.remarks && (
+                        <div>
+                          <span className="font-semibold text-muted-foreground block text-xs uppercase tracking-wide">Customer Remarks</span>
+                          <span className="text-foreground mt-1 block italic text-xs leading-relaxed bg-white/50 p-2 rounded border border-pink-100/40">
+                            "{retDetails.remarks}"
+                          </span>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                )}
 
-                {/* Return Images Gallery */}
-                {(() => {
-                  let parsedImages: string[] = [];
-                  if (returnDetails.images) {
-                    if (typeof returnDetails.images === "string") {
-                      try {
-                        parsedImages = JSON.parse(returnDetails.images);
-                      } catch {
-                        const cleaned = returnDetails.images.trim();
-                        if (cleaned.startsWith("[") && cleaned.endsWith("]")) {
+                    {/* Returned Items */}
+                    {Array.isArray(retDetails.items) && retDetails.items.length > 0 && (
+                      <div className="border-t border-pink-100/40 pt-3">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Items Requesting Return/Exchange</h4>
+                        <div className="space-y-2">
+                          {retDetails.items.map((item: any, i: number) => {
+                            const productInfo = productMap.get(item.productId);
+                            const title = item.product?.name || productInfo?.title || item.productName || "Product Item";
+                            const imageUrl = getValidImageUrl(productInfo?.thumbnail || item.imageUrl || "https://picsum.photos/seed/gift/400/400");
+                            return (
+                              <div key={i} className="flex items-center gap-3 bg-white p-2.5 rounded-lg border border-pink-100/40 hover:border-pink-200 transition-colors">
+                                <div className="relative w-12 h-12 rounded overflow-hidden shrink-0 border bg-muted">
+                                  <Image src={imageUrl} alt={title} fill className="object-cover" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-semibold text-sm text-foreground truncate">{title}</p>
+                                  {item.remarks && <p className="text-xs text-muted-foreground italic mt-0.5">"{item.remarks}"</p>}
+                                </div>
+                                <div className="text-xs font-bold text-muted-foreground shrink-0 bg-muted px-2.5 py-1 rounded">
+                                  Qty: {item.requestedQty || item.quantity || 1}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Return Images Gallery */}
+                    {(() => {
+                      let parsedImages: string[] = [];
+                      if (retDetails.images) {
+                        if (typeof retDetails.images === "string") {
                           try {
-                            parsedImages = cleaned
-                              .slice(1, -1)
-                              .split(",")
-                              .map((s: string) => s.trim().replace(/^["']|["']$/g, ""));
+                            parsedImages = JSON.parse(retDetails.images);
                           } catch {
-                            parsedImages = [returnDetails.images];
+                            const cleaned = retDetails.images.trim();
+                            if (cleaned.startsWith("[") && cleaned.endsWith("]")) {
+                              try {
+                                parsedImages = cleaned
+                                  .slice(1, -1)
+                                  .split(",")
+                                  .map((s: string) => s.trim().replace(/^["']|["']$/g, ""));
+                              } catch {
+                                parsedImages = [retDetails.images];
+                              }
+                            } else {
+                              parsedImages = [retDetails.images];
+                            }
                           }
-                        } else {
-                          parsedImages = [returnDetails.images];
+                        } else if (Array.isArray(retDetails.images)) {
+                          parsedImages = retDetails.images;
                         }
                       }
-                    } else if (Array.isArray(returnDetails.images)) {
-                      parsedImages = returnDetails.images;
-                    }
-                  }
-                  if (parsedImages.length === 0) return null;
-                  return (
-                    <div className="border-t border-pink-100/40 pt-3">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Customer Attachments</h4>
-                      <div className="flex flex-wrap gap-2">
-                        {parsedImages.map((img: string, i: number) => {
-                          const imgUrl = getValidImageUrl(img);
-                          return (
-                            <a
-                              key={i}
-                              href={imgUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="relative w-16 h-16 rounded-lg overflow-hidden border border-pink-100 bg-white shrink-0 hover:ring-2 hover:ring-primary/50 transition-all cursor-zoom-in group"
-                            >
-                              <Image
-                                src={imgUrl}
-                                alt={`Attachment ${i + 1}`}
-                                fill
-                                className="object-cover group-hover:scale-105 transition-transform duration-300"
-                              />
-                            </a>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })()}
-              </CardContent>
-            </Card>
+                      if (parsedImages.length === 0) return null;
+                      return (
+                        <div className="border-t border-pink-100/40 pt-3">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Customer Attachments</h4>
+                          <div className="flex flex-wrap gap-2">
+                            {parsedImages.map((img: string, i: number) => {
+                              const imgUrl = getValidImageUrl(img);
+                              return (
+                                <a
+                                  key={i}
+                                  href={imgUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="relative w-16 h-16 rounded-lg overflow-hidden border border-pink-100 bg-white shrink-0 hover:ring-2 hover:ring-primary/50 transition-all cursor-zoom-in group"
+                                >
+                                  <Image
+                                    src={imgUrl}
+                                    alt={`Attachment ${i + 1}`}
+                                    fill
+                                    className="object-cover group-hover:scale-105 transition-transform duration-300"
+                                  />
+                                </a>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           )}
 
           <Card className="border-border">
@@ -1263,14 +1276,20 @@ function OrderDetailPageContent({
                                   )}
                                   <p className="text-xs text-muted-foreground">Qty: {qty} × ₹{price.toLocaleString("en-IN")}</p>
                                   {(() => {
-                                    const isReturnedItem = returnDetails?.items?.find(
-                                      (ri: any) => ri.productId === getOrderItemProductId(item)
+                                    const returnedRequest = allReturnDetails?.find((ret: any) => 
+                                      ret.items?.some((ri: any) => {
+                                        const riProdId = ri.productId;
+                                        const riVarId = ri.variantId && typeof ri.variantId === "object" ? ri.variantId._id : (typeof ri.variantId === "string" ? ri.variantId : null);
+                                        const prodId = getOrderItemProductId(item);
+                                        const varId = item.variantId && typeof item.variantId === "object" ? item.variantId._id : (typeof item.variantId === "string" ? item.variantId : null);
+                                        return riProdId === prodId && (varId === riVarId || (!varId && !riVarId));
+                                      })
                                     );
-                                    if (!isReturnedItem) return null;
+                                    if (!returnedRequest) return null;
                                     return (
                                       <div className="mt-1">
                                         <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-pink-100 text-pink-800 uppercase tracking-wider border border-pink-200">
-                                          {(returnDetails.returnType === "EXCHANGE" || returnDetails.returnType === "SAME_PRODUCT_EXCHANGE") ? "Exchange Requested" : "Refund Requested"}
+                                          {(returnedRequest.returnType === "EXCHANGE" || returnedRequest.returnType === "SAME_PRODUCT_EXCHANGE") ? "Exchange Requested" : "Refund Requested"}
                                         </span>
                                       </div>
                                     );
@@ -1295,67 +1314,79 @@ function OrderDetailPageContent({
                                     );
                                   })()
                                 )}
-                                {!returnDetails && (
-                                  <>
-                                    <Button
-                                      size="sm"
-                                      className="h-8 text-xs font-semibold rounded-lg bg-pink-600 hover:bg-pink-700 text-white hover:text-white border-none"
-                                      onClick={() => {
-                                        const prodId = getOrderItemProductId(item) || "";
-                                        const varId = item.variantId && typeof item.variantId === "object" ? item.variantId._id : (typeof item.variantId === "string" ? item.variantId : null);
-                                        setReturnItem({
-                                          productId: prodId,
-                                          variantId: varId,
-                                          quantity: qty || 1,
-                                          title,
-                                          image: thumb,
-                                        });
-                                        setReturnRequestType("return");
-                                        setReturnReason("");
-                                        setReturnComment("");
-                                        setReturnImages([]);
-                                        const isCod = (order as any)?.paymentMode === "COD" || order?.paymentMethod?.toUpperCase() === "COD";
-                                        setRefundReceivingSource(isCod ? "UPI" : "ORIGINAL_SOURCE");
-                                        setUpiId("");
-                                        setAccountHolderName("");
-                                        setBankName("");
-                                        setAccountNumber("");
-                                        setIfscCode("");
-                                        setReturnDialogOpen(true);
-                                      }}
-                                    >
-                                      REFUND
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      className="h-8 text-xs font-semibold rounded-lg bg-pink-600 hover:bg-pink-700 text-white hover:text-white border-none"
-                                      onClick={() => {
-                                        const prodId = getOrderItemProductId(item) || "";
-                                        const varId = item.variantId && typeof item.variantId === "object" ? item.variantId._id : (typeof item.variantId === "string" ? item.variantId : null);
-                                        setReturnItem({
-                                          productId: prodId,
-                                          variantId: varId,
-                                          quantity: qty || 1,
-                                          title,
-                                          image: thumb,
-                                        });
-                                        setReturnRequestType("exchange");
-                                        setReturnReason("");
-                                        setReturnComment("");
-                                        setReturnImages([]);
-                                        setRefundReceivingSource("");
-                                        setUpiId("");
-                                        setAccountHolderName("");
-                                        setBankName("");
-                                        setAccountNumber("");
-                                        setIfscCode("");
-                                        setReturnDialogOpen(true);
-                                      }}
-                                    >
-                                      Same Product Exchange
-                                    </Button>
-                                  </>
-                                )}
+                                {(() => {
+                                  const returnedRequest = allReturnDetails?.find((ret: any) => 
+                                    ret.items?.some((ri: any) => {
+                                      const riProdId = ri.productId;
+                                      const riVarId = ri.variantId && typeof ri.variantId === "object" ? ri.variantId._id : (typeof ri.variantId === "string" ? ri.variantId : null);
+                                      const prodId = getOrderItemProductId(item);
+                                      const varId = item.variantId && typeof item.variantId === "object" ? item.variantId._id : (typeof item.variantId === "string" ? item.variantId : null);
+                                      return riProdId === prodId && (varId === riVarId || (!varId && !riVarId));
+                                    })
+                                  );
+                                  if (returnedRequest) return null;
+                                  return (
+                                    <>
+                                      <Button
+                                        size="sm"
+                                        className="h-8 text-xs font-semibold rounded-lg bg-pink-600 hover:bg-pink-700 text-white hover:text-white border-none"
+                                        onClick={() => {
+                                          const prodId = getOrderItemProductId(item) || "";
+                                          const varId = item.variantId && typeof item.variantId === "object" ? item.variantId._id : (typeof item.variantId === "string" ? item.variantId : null);
+                                          setReturnItem({
+                                            productId: prodId,
+                                            variantId: varId,
+                                            quantity: qty || 1,
+                                            title,
+                                            image: thumb,
+                                          });
+                                          setReturnRequestType("return");
+                                          setReturnReason("");
+                                          setReturnComment("");
+                                          setReturnImages([]);
+                                          const isCod = (order as any)?.paymentMode === "COD" || order?.paymentMethod?.toUpperCase() === "COD";
+                                          setRefundReceivingSource(isCod ? "UPI" : "ORIGINAL_SOURCE");
+                                          setUpiId("");
+                                          setAccountHolderName("");
+                                          setBankName("");
+                                          setAccountNumber("");
+                                          setIfscCode("");
+                                          setReturnDialogOpen(true);
+                                        }}
+                                      >
+                                        REFUND
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        className="h-8 text-xs font-semibold rounded-lg bg-pink-600 hover:bg-pink-700 text-white hover:text-white border-none"
+                                        onClick={() => {
+                                          const prodId = getOrderItemProductId(item) || "";
+                                          const varId = item.variantId && typeof item.variantId === "object" ? item.variantId._id : (typeof item.variantId === "string" ? item.variantId : null);
+                                          setReturnItem({
+                                            productId: prodId,
+                                            variantId: varId,
+                                            quantity: qty || 1,
+                                            title,
+                                            image: thumb,
+                                          });
+                                          setReturnRequestType("exchange");
+                                          setReturnReason("");
+                                          setReturnComment("");
+                                          setReturnImages([]);
+                                          setRefundReceivingSource("");
+                                          setUpiId("");
+                                          setAccountHolderName("");
+                                          setBankName("");
+                                          setAccountNumber("");
+                                          setIfscCode("");
+                                          setReturnDialogOpen(true);
+                                        }}
+                                      >
+                                        Same Product Exchange
+                                      </Button>
+                                    </>
+                                  );
+                                })()}
                                 <Button
                                   size="sm"
                                   className="h-8 text-xs font-semibold rounded-lg bg-pink-600 hover:bg-pink-700 text-white hover:text-white border-none"
