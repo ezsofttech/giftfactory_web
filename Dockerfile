@@ -1,21 +1,20 @@
 # syntax=docker/dockerfile:1
 
 # --- Build: NEXT_PUBLIC_* must be set here (baked into the Next.js client bundle) ---
-FROM --platform=linux/amd64 node:20-alpine AS build
+FROM node:20-alpine AS build
 WORKDIR /app
 
 ARG NEXT_PUBLIC_API_BASE_URL
-ARG NEXT_PUBLIC_SITE_URL
+ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_APP_URL
 ARG NEXT_PUBLIC_RAZORPAY_KEY_ID
-ARG NEXT_PUBLIC_BASE_URL_LOCAL
 ARG APP_ENV=production
 
 ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
-ENV NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL:-$NEXT_PUBLIC_APP_URL}
-ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-$NEXT_PUBLIC_SITE_URL}
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-$NEXT_PUBLIC_API_BASE_URL}
+ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
+ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_APP_URL
 ENV NEXT_PUBLIC_RAZORPAY_KEY_ID=$NEXT_PUBLIC_RAZORPAY_KEY_ID
-ENV NEXT_PUBLIC_BASE_URL_LOCAL=${NEXT_PUBLIC_BASE_URL_LOCAL:-$NEXT_PUBLIC_API_BASE_URL}
 ENV APP_ENV=$APP_ENV
 
 COPY package.json package-lock.json ./
@@ -24,8 +23,8 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-# --- Runtime: server-side env (health checks, SSR, NextAuth) ---
-FROM --platform=linux/amd64 node:20-alpine AS runner
+# --- Runtime: server-side env (health checks, SSR) ---
+FROM node:20-alpine AS runner
 WORKDIR /app
 RUN apk add --no-cache wget
 

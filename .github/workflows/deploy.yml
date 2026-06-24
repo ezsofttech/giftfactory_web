@@ -22,7 +22,7 @@ jobs:
       DEPLOY_ENV: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
       IMAGE_TAG: ${{ github.ref == 'refs/heads/main' && 'prod-latest' || 'dev-latest' }}
       API_BASE_URL: ${{ github.ref == 'refs/heads/main' && 'https://api.ezzme.com/api/v1' || 'https://dev-api.ezzme.com/api/v1' }}
-      SITE_URL: ${{ github.ref == 'refs/heads/main' && 'https://giftfactory.ezzme.com' || 'https://dev-giftfactory.ezzme.com' }}
+      APP_URL: ${{ github.ref == 'refs/heads/main' && 'https://giftfactory.ezzme.com' || 'https://dev-giftfactory.ezzme.com' }}
       APP_ENV: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
       ECS_SERVICE: ${{ github.ref == 'refs/heads/main' && 'giftfactory-web-production' || 'giftfactory-web-development' }}
 
@@ -44,26 +44,15 @@ jobs:
           context: .
           file: Dockerfile
           push: true
-          platforms: linux/amd64
           tags: |
             ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
             ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}-${{ github.sha }}
           build-args: |
             NEXT_PUBLIC_API_BASE_URL=${{ env.API_BASE_URL }}
-            NEXT_PUBLIC_SITE_URL=${{ env.SITE_URL }}
-            NEXT_PUBLIC_APP_URL=${{ env.SITE_URL }}
+            NEXT_PUBLIC_API_URL=${{ env.API_BASE_URL }}
+            NEXT_PUBLIC_APP_URL=${{ env.APP_URL }}
             NEXT_PUBLIC_RAZORPAY_KEY_ID=${{ secrets.NEXT_PUBLIC_RAZORPAY_KEY_ID }}
             APP_ENV=${{ env.APP_ENV }}
-
-      - name: Verify image in ECR
-        run: |
-          aws ecr describe-images \
-            --repository-name "${ECR_REPOSITORY}" \
-            --image-ids "imageTag=${IMAGE_TAG}" \
-            --region "${AWS_REGION}" \
-            --query 'imageDetails[0].imageTags' \
-            --output text
-          echo "Image ${ECR_REPOSITORY}:${IMAGE_TAG} is available in ECR."
 
       - name: Deploy ECS with rollback on failure
         run: |
@@ -111,5 +100,5 @@ jobs:
 
       - name: Verify health endpoint
         run: |
-          curl -fsS "${SITE_URL}/api/health/live"
-          curl -fsS "${SITE_URL}/api/health/ready"
+          curl -fsS "${APP_URL}/api/health/live"
+          curl -fsS "${APP_URL}/api/health/ready"
