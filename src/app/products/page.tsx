@@ -229,6 +229,13 @@ function ProductListPageContent() {
     }
     if (filters.discountMin != null) {
       mapped = mapped.filter((p) => p.discountPercentage >= filters.discountMin!);
+      if (filters.sortBy === "createdAt") {
+        mapped = [...mapped].sort((a, b) => {
+          const ad = Number(a.discountPercentage ?? 0);
+          const bd = Number(b.discountPercentage ?? 0);
+          return ad - bd;
+        });
+      }
     }
 
     // Preserve correct ordering after variant flattening: sort by final card price.
