@@ -22,6 +22,7 @@ import {
   Trash2,
   ImagePlus,
   Loader2,
+  ImageOff,
 } from "lucide-react";
 import { submitReview, fetchOrderById, fetchOrderByOrderNumber, returnRequestOrder, createOnlineReturnRequestV2, uploadReturnImage, createSupportTicket, fetchProductById, cancelOrder, fetchProductReviews, updateReview, downloadInvoice, fetchReturnRequestByOrderNumber, fetchReturnRequestV2Detail, fetchReturnRequestsV2 } from "@/lib/api";
 import { useAuthModal } from "@/provider/auth-modal-provider";
@@ -1193,20 +1194,11 @@ function OrderDetailPageContent({
                             {parsedImages.map((img: string, i: number) => {
                               const imgUrl = getValidImageUrl(img);
                               return (
-                                <a
+                                <AttachmentThumbnail
                                   key={i}
-                                  href={imgUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="relative w-16 h-16 rounded-lg overflow-hidden border border-pink-100 bg-white shrink-0 hover:ring-2 hover:ring-primary/50 transition-all cursor-zoom-in group"
-                                >
-                                  <Image
-                                    src={imgUrl}
-                                    alt={`Attachment ${i + 1}`}
-                                    fill
-                                    className="object-cover group-hover:scale-105 transition-transform duration-300"
-                                  />
-                                </a>
+                                  imgUrl={imgUrl}
+                                  index={i}
+                                />
                               );
                             })}
                           </div>
@@ -1786,6 +1778,34 @@ function OrderDetailPageContent({
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function AttachmentThumbnail({ imgUrl, index }: { imgUrl: string; index: number }) {
+  const [hasError, setHasError] = useState(false);
+
+  return (
+    <a
+      href={imgUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="relative w-16 h-16 rounded-lg overflow-hidden border border-pink-100 bg-white shrink-0 hover:ring-2 hover:ring-primary/50 transition-all cursor-zoom-in group flex items-center justify-center"
+    >
+      {hasError ? (
+        <div className="flex flex-col items-center justify-center w-full h-full bg-rose-50/20 text-rose-500/80 p-1 text-[10px] text-center select-none font-semibold">
+          <ImageOff className="h-4 w-4 mb-1 text-rose-400/80" />
+          <span className="leading-tight">Broken Image</span>
+        </div>
+      ) : (
+        <Image
+          src={imgUrl}
+          alt={`Attachment ${index + 1}`}
+          fill
+          className="object-cover group-hover:scale-105 transition-transform duration-300"
+          onError={() => setHasError(true)}
+        />
+      )}
+    </a>
   );
 }
 
