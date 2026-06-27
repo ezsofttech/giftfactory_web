@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useAuthModal } from "@/provider/auth-modal-provider";
 import { CheckoutForm } from "@/components/form/checkout-form";
 import { OrderSummary } from "@/components/sections";
-import { fetchCart, fetchProductById, productQueryKey, PRODUCT_STALE_TIME_MS } from "@/lib/api";
+import { fetchCart, fetchProductById, productQueryKey, PRODUCT_STALE_TIME_MS, validateCoupon } from "@/lib/api";
 import type { ApiCoupon } from "@/lib/api";
 import type { ApiCart, ApiProduct } from "@/types/api";
 
@@ -45,8 +45,24 @@ function CheckoutPageContent() {
   const buyNowQuantity = Math.max(1, parseInt(searchParams.get("quantity") ?? "1", 10));
   const buyNowPrice = parseFloat(searchParams.get("price") ?? "0");
   const cartIdParam = searchParams.get("cartId");
+  const couponParam = searchParams.get("coupon");
 
   const isBuyNow = (!!buyNowProductId || !!buyNowVariantId) && buyNowPrice > 0;
+
+  useEffect(() => {
+    if (couponParam && status === "authenticated") {
+      validateCoupon(couponParam)
+        .then((res) => {
+          const coupon = res?.data ?? res;
+          if (coupon) {
+            setAppliedCoupon(coupon);
+          }
+        })
+        .catch((err) => {
+          console.error("Failed to auto-apply coupon from URL:", err);
+        });
+    }
+  }, [couponParam, status]);
 
   useEffect(() => {
     if (status !== "authenticated" && status !== "loading" && !authOpenedRef.current) {

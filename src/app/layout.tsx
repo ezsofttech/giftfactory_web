@@ -8,6 +8,7 @@ import { AuthModalProvider } from "@/provider/auth-modal-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { Header, Footer, MobileBottomNav, SiteBreadcrumbs } from "@/components/layout";
 import { GuestCartSync } from "@/components/guest-cart-sync";
+import { AbandonedCartRecovery } from "@/components/abandoned-cart-recovery";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://giftfactory.example.com";
 
@@ -61,6 +62,7 @@ export default function RootLayout({
               <CustomerThemeProvider>
                 <AuthModalProvider>
                   <GuestCartSync />
+                  <AbandonedCartRecovery />
                   <Header />
                   <SiteBreadcrumbs />
                   <main className="min-h-screen flex flex-col pb-14 md:pb-0">{children}</main>

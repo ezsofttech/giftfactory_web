@@ -12,9 +12,12 @@ import {
 import { 
   useNotifications, 
   useMarkAsRead,
+  useRetentionRecommendations,
+  mapRetentionProductToDisplay,
   NotificationItem
 } from '@/store/notification-store';
 import { cn } from '@/lib/utils';
+import { ProductCard } from '@/components/card/main-product-card';
 
 export default function NotificationPage() {
   const router = useRouter();
@@ -22,7 +25,7 @@ export default function NotificationPage() {
   const { openAuthModal } = useAuthModal();
   const authOpenedRef = useRef(false);
 
-  const [activeTab, setActiveTab] = useState<'all' | 'unread'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'unread' | 'offers'>('all');
   const [mounted, setMounted] = useState(false);
 
   // Dynamic Island States ('hidden' | 'notch' | 'expanded')
@@ -38,6 +41,10 @@ export default function NotificationPage() {
     enabled: status === 'authenticated',
   });
   const markAsRead = useMarkAsRead();
+
+  const { data: recProducts = [], isLoading: recLoading } = useRetentionRecommendations({
+    enabled: status === 'authenticated' && activeTab === 'offers',
+  });
 
   // Safe SSR mounting boundary and load settings
   useEffect(() => {
@@ -228,7 +235,7 @@ export default function NotificationPage() {
 
         {/* Navigation Tabs */}
         <div className="flex border-b border-slate-100 bg-slate-50/50 p-1.5">
-          {(['all', 'unread'] as const).map(tab => (
+          {(['all', 'unread', 'offers'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -239,8 +246,16 @@ export default function NotificationPage() {
                   : "text-slate-500 hover:text-slate-800 hover:bg-white/40"
               )}
             >
-              {tab === 'all' && 'All'}
+              {tab === 'all' && 'All Alerts'}
               {tab === 'unread' && `Unread (${unreadCount})`}
+              {tab === 'offers' && (
+                <span className="flex items-center justify-center gap-1.5">
+                  <span>Recommended Gifts</span>
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-extrabold bg-pink-500 text-white animate-pulse">
+                    HOT
+                  </span>
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -315,6 +330,39 @@ export default function NotificationPage() {
                     )}
                   </div>
                 ))}
+              </div>
+            )
+          )}
+
+          {/* Recommended Gifts List */}
+          {activeTab === 'offers' && (
+            recLoading ? (
+              <div className="flex flex-col items-center justify-center py-24 gap-3">
+                <div className="w-10 h-10 border-2 border-slate-300 border-t-pink-500 rounded-full animate-spin" />
+                <span className="text-xs text-slate-500 font-medium">Curating gifts for you...</span>
+              </div>
+            ) : recProducts.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-24 text-center px-6">
+                <div className="w-16 h-16 rounded-full bg-rose-50 flex items-center justify-center text-rose-500 mb-4">
+                  <Inbox className="w-8 h-8" />
+                </div>
+                <p className="text-base font-semibold text-slate-900">No Offers Right Now</p>
+                <p className="text-xs text-slate-500 mt-1.5 max-w-[240px]">
+                  Check back later for personalized recommendations and exclusive member deals!
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 p-6">
+                {recProducts.map((p) => {
+                  const mapped = mapRetentionProductToDisplay(p);
+                  return (
+                    <ProductCard
+                      key={mapped.id}
+                      product={mapped}
+                      className="w-full h-full border border-rose-50/50 hover:border-pink-200 hover:shadow-xl hover:shadow-pink-950/5 transition-all duration-300"
+                    />
+                  );
+                })}
               </div>
             )
           )}

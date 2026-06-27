@@ -16,6 +16,7 @@ import { useAuthModal } from "@/provider/auth-modal-provider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { User, Package, MapPin, Heart, LogOut } from "lucide-react";
+import { useCustomerSegments } from "@/store/notification-store";
 
 export default function ProfilePage() {
   const { data: session, status } = useSession();
@@ -45,6 +46,10 @@ export default function ProfilePage() {
   });
   
   const wishlistCount = (wishlistIdsRes?.data ?? []).length;
+
+  const { data: segments = [] } = useCustomerSegments({
+    enabled: status === "authenticated",
+  });
 
   const rawProfile = (profileData?.data || profileData) as any;
   const backendProfile = rawProfile?.customer ? rawProfile.customer : rawProfile;
@@ -108,6 +113,21 @@ export default function ProfilePage() {
             <p className="text-muted-foreground text-xs sm:text-base mt-0.5 truncate">
               {userEmail}
             </p>
+            {segments && segments.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {segments.map((seg: string) => (
+                  <span
+                    key={seg}
+                    className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold bg-accent text-accent-foreground border border-primary/20 shadow-xs"
+                  >
+                    {seg.toUpperCase() === "VIP" 
+                      ? "VIP" 
+                      : seg.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
+                    }
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
           <Button
             variant="outline"

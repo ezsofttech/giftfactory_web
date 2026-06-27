@@ -12,9 +12,12 @@ import {
 import { 
   useNotifications, 
   useMarkAsRead,
+  useRetentionRecommendations,
+  mapRetentionProductToDisplay,
   NotificationItem
 } from '@/store/notification-store';
 import { cn } from '@/lib/utils';
+import { ProductCard } from '@/components/card/main-product-card';
 
 export function NotificationDropdown() {
   const router = useRouter();
@@ -22,7 +25,7 @@ export function NotificationDropdown() {
   const { openAuthModal } = useAuthModal();
   
   const [isOpen, setIsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'all' | 'unread'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'unread' | 'offers'>('all');
   const [mounted, setMounted] = useState(false);
 
   // Dynamic Island States ('hidden' | 'notch' | 'expanded')
@@ -41,6 +44,10 @@ export function NotificationDropdown() {
     enabled: status === 'authenticated',
   });
   const markAsRead = useMarkAsRead();
+
+  const { data: recProducts = [], isLoading: recLoading } = useRetentionRecommendations({
+    enabled: status === 'authenticated' && activeTab === 'offers',
+  });
 
   // Responsive width tracking to prevent screen overflow
   const [dropdownWidth, setDropdownWidth] = useState(420);
@@ -274,7 +281,7 @@ export function NotificationDropdown() {
 
             {/* Navigation Tabs */}
             <div className="flex border-b border-slate-100 bg-slate-50/50 p-1">
-              {(['all', 'unread'] as const).map(tab => (
+              {(['all', 'unread', 'offers'] as const).map(tab => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -287,11 +294,19 @@ export function NotificationDropdown() {
                 >
                   {tab === 'all' && 'All'}
                   {tab === 'unread' && `Unread (${unreadCount})`}
+                  {tab === 'offers' && (
+                    <span className="flex items-center justify-center gap-1">
+                      <span>Offers</span>
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-extrabold bg-pink-500 text-white animate-pulse">
+                        HOT
+                      </span>
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
 
-            {/* List / Tabs Content */}
+             {/* List / Tabs Content */}
             <div className="flex-1 overflow-y-auto min-h-[350px] max-h-[440px] no-scrollbar">
               
               {/* Notifications List */}
@@ -370,11 +385,43 @@ export function NotificationDropdown() {
                 )
               )}
 
-            </div>
+              {/* Recommended Gifts / Offers List */}
+              {activeTab === 'offers' && (
+                recLoading ? (
+                  <div className="flex flex-col items-center justify-center py-16 gap-3">
+                    <div className="w-8 h-8 border-2 border-slate-300 border-t-pink-500 rounded-full animate-spin" />
+                    <span className="text-xs text-slate-500">Retrieving special offers...</span>
+                  </div>
+                ) : recProducts.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-center px-6">
+                    <div className="w-12 h-12 rounded-full bg-rose-50 flex items-center justify-center text-rose-500 mb-4 animate-bounce">
+                      <Inbox className="w-6 h-6" />
+                    </div>
+                    <p className="text-sm font-semibold text-slate-900">No Offers Right Now</p>
+                    <p className="text-xs text-slate-500 mt-1 max-w-[240px]">
+                      Check back later for personalized recommendations and exclusive deals!
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3 p-3 max-h-[440px] overflow-y-auto">
+                    {recProducts.map((p) => {
+                      const mapped = mapRetentionProductToDisplay(p);
+                      return (
+                        <ProductCard
+                          key={mapped.id}
+                          product={mapped}
+                          className="w-full scale-95 hover:scale-[0.98] transition-transform duration-200 border border-slate-100"
+                        />
+                      );
+                    })}
+                  </div>
+                )
+              )}
           </div>
-        </>,
-        document.body
-      )}
+        </div>
+      </>,
+      document.body
+    )}
 
       {/* High-Fidelity iPhone Dynamic Island popup */}
       {mounted && typeof document !== 'undefined' && createPortal(
