@@ -6,6 +6,7 @@ import { API_ENDPOINTS } from '@/constants/api';
 import type { ProductDisplay } from '@/types/api';
 
 const get = axiosInstance.get.bind(axiosInstance);
+const post = axiosInstance.post.bind(axiosInstance);
 const patch = axiosInstance.patch.bind(axiosInstance);
 
 export type NotificationItem = {
@@ -123,5 +124,17 @@ export function useCustomerSegments(options?: { enabled?: boolean }) {
       return Array.isArray(raw) ? raw : [];
     },
     ...options,
+  });
+}
+
+/**
+ * Mutation hook to register a referral invite.
+ */
+export function useReferralInvite() {
+  return useMutation({
+    mutationFn: async (body: { referrerCode: string; refereeEmail: string }) => {
+      const { data } = await post(API_ENDPOINTS.customer.retentionReferralInvite, body);
+      return data;
+    },
   });
 }

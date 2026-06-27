@@ -8,6 +8,8 @@ import Link from "next/link";
 import { useAuthModal } from "@/provider/auth-modal-provider";
 import { fetchLoyaltyBalance, fetchLoyaltyHistory } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { useReferralInvite } from "@/store/notification-store";
+import { toast } from "sonner";
 import {
   ChevronDown,
   ChevronUp,
@@ -23,7 +25,10 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   ShieldCheck,
-  Zap
+  Zap,
+  Send,
+  Copy,
+  Check
 } from "lucide-react";
 
 // Large Loyalty Coin Icon
@@ -79,6 +84,51 @@ export default function LoyaltyPage() {
 
   const [isActivityOpen, setIsActivityOpen] = useState(true);
   const [isFaqOpen, setIsFaqOpen] = useState(false);
+
+  const [refeeEmail, setRefeeEmail] = useState("");
+  const [isCopied, setIsCopied] = useState(false);
+  const inviteMutation = useReferralInvite();
+
+  const actualReferrerId = session?.userId || (session?.user as any)?.customerId || session?.user?.id || "";
+
+  const handleCopyReferralCode = async () => {
+    if (!actualReferrerId) return;
+    try {
+      await navigator.clipboard.writeText(actualReferrerId);
+      setIsCopied(true);
+      toast.success("Referral code copied!");
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+    }
+  };
+
+  const handleSendInvite = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!refeeEmail) return;
+    if (!actualReferrerId) {
+      toast.error("Please sign in to invite friends.");
+      return;
+    }
+
+    inviteMutation.mutate(
+      {
+        referrerCode: actualReferrerId,
+        refereeEmail: refeeEmail,
+      },
+      {
+        onSuccess: (data: any) => {
+          const msg = data?.message || `Referral invite registered for ${refeeEmail}`;
+          toast.success(msg);
+          setRefeeEmail("");
+        },
+        onError: (err: any) => {
+          console.error("Referral failed:", err);
+          toast.error(err?.response?.data?.message || "Failed to send referral invite.");
+        },
+      }
+    );
+  };
 
   useEffect(() => {
     if (status !== "authenticated" && status !== "loading" && !authOpenedRef.current) {
@@ -274,6 +324,72 @@ export default function LoyaltyPage() {
             <Link href="/products?categoryId=hampers" className="text-xs font-semibold text-primary hover:underline flex items-center pt-2">
               View Gift Hampers
             </Link>
+          </div>
+        </div>
+
+        {/* REFER A FRIEND SECTION */}
+        <div className="bg-white border border-gray-150 rounded-xl p-6 shadow-xs relative overflow-hidden">
+          {/* Subtle decoration */}
+          <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-full pointer-events-none" />
+
+          <div className="flex flex-col lg:flex-row gap-6 items-start lg:items-center justify-between relative z-10">
+            <div className="space-y-2 max-w-xl">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-pink-50 text-primary rounded-lg">
+                  <Users className="w-5 h-5" />
+                </div>
+                <h2 className="text-lg font-bold text-gray-900">Refer a Friend, Share the Love! 🤝</h2>
+              </div>
+              <p className="text-sm text-gray-600 leading-relaxed">
+                Invite your friends to Gift Factory. When they sign up and place their first order, you both earn bonus SuperCoins!
+              </p>
+
+              {/* Referral code display */}
+              {actualReferrerId && (
+                <div className="flex items-center gap-2 pt-1 text-xs">
+                  <span className="text-gray-500">Your Referral Code:</span>
+                  <div className="inline-flex items-center gap-1.5 bg-gray-50 border border-gray-200 px-2 py-1 rounded font-mono font-bold text-gray-800">
+                    <span>{actualReferrerId}</span>
+                    <button
+                      type="button"
+                      onClick={handleCopyReferralCode}
+                      className="text-gray-400 hover:text-primary transition-colors focus:outline-none cursor-pointer"
+                      title="Copy Code"
+                    >
+                      {isCopied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Email form */}
+            <form onSubmit={handleSendInvite} className="w-full lg:w-96 flex flex-col sm:flex-row gap-2 shrink-0">
+              <div className="relative flex-1">
+                <input
+                  type="email"
+                  required
+                  placeholder="Enter friend's email"
+                  value={refeeEmail}
+                  onChange={(e) => setRefeeEmail(e.target.value)}
+                  className="w-full px-4 py-2 text-sm border border-gray-300 rounded-xl focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all  dark:border-zinc-700 text-gray-900"
+                />
+              </div>
+              <Button
+                type="submit"
+                disabled={inviteMutation.isPending}
+                className="px-5 py-2 text-sm font-semibold rounded-xl bg-primary hover:bg-primary/95 text-white shadow-sm flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
+              >
+                {inviteMutation.isPending ? (
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <span>Send Invite</span>
+                    <Send className="w-3.5 h-3.5" />
+                  </>
+                )}
+              </Button>
+            </form>
           </div>
         </div>
 

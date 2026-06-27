@@ -109,6 +109,7 @@ export const API_ENDPOINTS = {
     retentionRecommendations: `${BASE}/retention/recommendations`,
     retentionAbandonedCart: `${BASE}/retention/abandoned-cart`,
     retentionSegments: `${BASE}/retention/segments`,
+    retentionReferralInvite: `${BASE}/retention/referral/invite`,
     viewProduct: `${BASE}/customer/view-product`,
     rfq: `${BASE}/customer/rfq`,
     rfqById: (id: string) => `${BASE}/customer/rfq/${id}`,
